@@ -33,23 +33,31 @@ You can run it two ways:
 
 **Web3 wallet**
 - Real MetaMask / EIP-1193 connection (`eth_requestAccounts`)
+- **WalletConnect** support for mobile wallets — scan a QR to pair (see setup below); the wallet module works against a pluggable provider, so injected and WalletConnect flows share the same code
 - Shows the connected account, network name, and native ETH balance
 - Reacts to account/chain changes and restores the session on reload
 - Chain switching helper and toast notifications
 - **Send native ETH** through the connected wallet (`eth_sendTransaction`), with precise wei conversion and a post-send balance refresh
+- **On-chain swap** — wrap / unwrap native ETH ↔ WETH by calling the canonical WETH9 contract directly (`deposit()` / `withdraw(uint256)`); a real on-chain transaction that needs no API key or SDK, supported on 7 chains
 - **Sign messages** with `personal_sign`
 - **Block-explorer links** for the connected address and sent transactions, resolved per chain (Etherscan, Polygonscan, Arbiscan, and more)
+
+**Wallet-based sign-in (Sign-In With Ethereum)**
+- Prove control of an address by signing a server-issued nonce (`personal_sign`) — no passwords
+- The server recovers the signer from the signature (secp256k1 + keccak256 via the audited `@noble/*` libraries) and issues an HMAC-signed session token
+- Signed-in users get their **own** persisted portfolio and watchlist; unauthenticated requests fall back to a shared `demo` scope
 
 **Backend API (optional)**
 - `GET /api/health` — service liveness
 - `GET /api/markets?ids=bitcoin,ethereum` — cached live market data
 - `GET /api/global` — cached global market stats
 - `GET /api/coins/:id/chart?days=7` — historical prices
-- `GET|POST|DELETE /api/watchlist` — watchlist persisted in SQLite
-- `GET|POST|DELETE /api/portfolio` — demo portfolio holdings persisted in SQLite, enriched with live prices and a computed USD total
+- `GET /api/auth/nonce` · `POST /api/auth/verify` · `GET /api/auth/me` — wallet sign-in
+- `GET|POST|DELETE /api/watchlist` — per-user watchlist persisted in SQLite
+- `GET|POST|DELETE /api/portfolio` — per-user portfolio holdings persisted in SQLite, enriched with live prices and a computed USD total
 
 **Persistence**
-- Watchlist and portfolio holdings are stored in **SQLite** (`better-sqlite3`) at `server/cryptohub.db`, so they survive server restarts
+- Watchlist and portfolio holdings are stored in **SQLite** (`better-sqlite3`) at `server/cryptohub.db`, keyed by user, so they survive server restarts
 - Falls back automatically to an in-memory store if the native SQLite module can't load, so the API works in any environment
 
 ---
@@ -61,7 +69,8 @@ You can run it two ways:
 | Frontend   | HTML5, CSS3 (variables, Flexbox, Grid), Vanilla JavaScript |
 | Charts     | Chart.js (CDN) |
 | Icons/Fonts| Font Awesome 6, Google Fonts (Poppins + Orbitron) |
-| Web3       | EIP-1193 provider (MetaMask) |
+| Web3       | EIP-1193 provider (MetaMask) + WalletConnect (mobile) |
+| Auth       | Sign-In With Ethereum (secp256k1 recovery via `@noble/curves` + `@noble/hashes`), HMAC session tokens |
 | Market data| CoinGecko public API |
 | Backend    | Node.js 18+, Express |
 | Persistence| SQLite via better-sqlite3 (in-memory fallback) |
@@ -84,7 +93,8 @@ blockchain-platform/
 │   └── app.js              # Shared bootstrap (connect button, toasts, badges, price flash)
 ├── server/
 │   ├── index.js            # Express API + static host
-│   └── db.js               # SQLite persistence (watchlist + portfolio holdings)
+│   ├── db.js               # SQLite persistence (watchlist + portfolio holdings)
+│   └── auth.js             # Wallet sign-in: signature recovery + session tokens
 ├── test/
 │   └── api.test.js         # API integration tests (node --test)
 ├── package.json            # Scripts + dependencies
@@ -143,12 +153,19 @@ npm test
 | GET    | `/api/markets?ids=…`         | Live market data (cached 30s)     |
 | GET    | `/api/global`                | Global market stats (cached 60s)  |
 | GET    | `/api/coins/:id/chart?days=` | Historical prices (cached 60s)    |
-| GET    | `/api/watchlist`             | Current watchlist (SQLite)        |
+| GET    | `/api/auth/nonce?address=…`  | Issue a nonce + message to sign   |
+| POST   | `/api/auth/verify`           | `{ address, signature }` → session token |
+| GET    | `/api/auth/me`               | Who the `Bearer` token authenticates as |
+| GET    | `/api/watchlist`             | Current watchlist (per-user)      |
 | POST   | `/api/watchlist`             | Add `{ "id": "bitcoin" }`         |
 | DELETE | `/api/watchlist/:id`         | Remove a coin                     |
-| GET    | `/api/portfolio?user=demo`   | Holdings + live prices + total    |
+| GET    | `/api/portfolio`             | Holdings + live prices + total    |
 | POST   | `/api/portfolio`             | Upsert `{ "coinId": "…", "amount": 1.5 }` |
 | DELETE | `/api/portfolio/:coinId`     | Remove a holding                  |
+
+Watchlist and portfolio requests are scoped to the authenticated wallet when an
+`Authorization: Bearer <token>` header is present; otherwise they operate on a
+shared `demo` scope. Send `Content-Type: application/json` for the POST bodies.
 
 ### Real-time data sources (browser, no key required)
 
@@ -162,11 +179,45 @@ npm test
 
 ## 🦊 Connecting a Wallet
 
-1. Install [MetaMask](https://metamask.io/download/).
+1. Install [MetaMask](https://metamask.io/download/) (or use a mobile wallet via WalletConnect).
 2. Click **Connect Wallet** in the header.
 3. Approve the connection. Your shortened address, network, and ETH balance appear.
 
-No wallet installed? The app prompts you and links to the MetaMask download page.
+No injected wallet detected? The app falls back to WalletConnect when it's
+configured, or links you to the MetaMask download page.
+
+### Signing in (optional)
+
+On the Wallet page, click **Sign in** to prove ownership of your address. This
+signs a nonce (no gas, no transaction) and scopes your portfolio and watchlist
+to your wallet on the backend. **Sign out** returns to the shared demo view.
+
+### Enabling WalletConnect
+
+WalletConnect needs a free project id from
+[Reown Cloud](https://cloud.reown.com) (formerly WalletConnect Cloud). Provide it
+in either of two ways before loading the page:
+
+```html
+<!-- in a page <head> -->
+<meta name="walletconnect-project-id" content="YOUR_PROJECT_ID">
+```
+
+```js
+// or set it globally before wallet.js runs
+window.CRYPTOHUB_WC_PROJECT_ID = 'YOUR_PROJECT_ID';
+```
+
+Without a project id the WalletConnect option stays visible but shows a hint to
+configure it — everything else keeps working.
+
+## ⚙️ Configuration
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `PORT` | Server port | `3000` |
+| `AUTH_SECRET` | HMAC secret for signing session tokens | random per process (set this in production so tokens survive restarts) |
+| `walletconnect-project-id` / `window.CRYPTOHUB_WC_PROJECT_ID` | Enables WalletConnect (client-side) | unset |
 
 ---
 
@@ -181,10 +232,9 @@ No wallet installed? The app prompts you and links to the MetaMask download page
 
 ## 🎯 Future Enhancements
 
-- WalletConnect support for mobile wallets
-- On-chain swaps via the connected provider (native ETH sending is already supported)
-- Server-side auth so portfolios are truly per-user (holdings are currently keyed by a `user` field, defaulting to `demo`)
-- Extract remaining inline CSS/JS from individual pages into `css/` and `js/`
+- Token-to-token swaps via a DEX router (native ETH ↔ WETH wrapping is supported today)
+- Multi-device sessions and token refresh for wallet sign-in
+- Move the remaining page-specific inline CSS into per-feature stylesheets (the shared "chrome" is already centralized in `css/shared.css`)
 
 ---
 
