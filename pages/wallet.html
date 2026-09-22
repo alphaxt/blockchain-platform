@@ -825,154 +825,10 @@
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody data-assets-body>
                             <tr class="asset-row">
-                                <td>
-                                    <div class="asset-info">
-                                        <div class="asset-icon">
-                                            <i class="fab fa-bitcoin"></i>
-                                        </div>
-                                        <div>
-                                            <div class="asset-name">Bitcoin</div>
-                                            <div class="asset-symbol">BTC</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>0.3542</td>
-                                <td>$21,890.45</td>
-                                <td class="asset-change positive">+3.2%</td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <div class="action-btn">
-                                            <i class="fas fa-arrow-up"></i>
-                                        </div>
-                                        <div class="action-btn">
-                                            <i class="fas fa-arrow-down"></i>
-                                        </div>
-                                        <div class="action-btn">
-                                            <i class="fas fa-exchange-alt"></i>
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                            
-                            <tr class="asset-row">
-                                <td>
-                                    <div class="asset-info">
-                                        <div class="asset-icon">
-                                            <i class="fab fa-ethereum"></i>
-                                        </div>
-                                        <div>
-                                            <div class="asset-name">Ethereum</div>
-                                            <div class="asset-symbol">ETH</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>4.82</td>
-                                <td>$16,432.10</td>
-                                <td class="asset-change positive">+1.8%</td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <div class="action-btn">
-                                            <i class="fas fa-arrow-up"></i>
-                                        </div>
-                                        <div class="action-btn">
-                                            <i class="fas fa-arrow-down"></i>
-                                        </div>
-                                        <div class="action-btn">
-                                            <i class="fas fa-exchange-alt"></i>
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                            
-                            <tr class="asset-row">
-                                <td>
-                                    <div class="asset-info">
-                                        <div class="asset-icon">
-                                            <i class="fas fa-coins"></i>
-                                        </div>
-                                        <div>
-                                            <div class="asset-name">Cardano</div>
-                                            <div class="asset-symbol">ADA</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>12,450</td>
-                                <td>$5,756.50</td>
-                                <td class="asset-change negative">-0.7%</td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <div class="action-btn">
-                                            <i class="fas fa-arrow-up"></i>
-                                        </div>
-                                        <div class="action-btn">
-                                            <i class="fas fa-arrow-down"></i>
-                                        </div>
-                                        <div class="action-btn">
-                                            <i class="fas fa-exchange-alt"></i>
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                            
-                            <tr class="asset-row">
-                                <td>
-                                    <div class="asset-info">
-                                        <div class="asset-icon">
-                                            <i class="fas fa-bolt"></i>
-                                        </div>
-                                        <div>
-                                            <div class="asset-name">Solana</div>
-                                            <div class="asset-symbol">SOL</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>32.5</td>
-                                <td>$4,626.25</td>
-                                <td class="asset-change positive">+5.6%</td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <div class="action-btn">
-                                            <i class="fas fa-arrow-up"></i>
-                                        </div>
-                                        <div class="action-btn">
-                                            <i class="fas fa-arrow-down"></i>
-                                        </div>
-                                        <div class="action-btn">
-                                            <i class="fas fa-exchange-alt"></i>
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                            
-                            <tr class="asset-row">
-                                <td>
-                                    <div class="asset-info">
-                                        <div class="asset-icon">
-                                            <i class="fab fa-usd"></i>
-                                        </div>
-                                        <div>
-                                            <div class="asset-name">USD Coin</div>
-                                            <div class="asset-symbol">USDC</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>1,250.00</td>
-                                <td>$1,250.00</td>
-                                <td class="asset-change">0.0%</td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <div class="action-btn">
-                                            <i class="fas fa-arrow-up"></i>
-                                        </div>
-                                        <div class="action-btn">
-                                            <i class="fas fa-arrow-down"></i>
-                                        </div>
-                                        <div class="action-btn">
-                                            <i class="fas fa-exchange-alt"></i>
-                                        </div>
-                                    </div>
+                                <td colspan="5" style="text-align:center;color:var(--secondary);padding:2rem;">
+                                    <i class="fas fa-spinner fa-spin"></i> Loading holdings…
                                 </td>
                             </tr>
                         </tbody>
@@ -995,88 +851,20 @@
                 <!-- Transaction History -->
                 <section class="transactions-section">
                     <div class="section-header">
-                        <h2 class="section-title">Recent Transactions</h2>
-                        <a href="#" style="color: var(--accent); text-decoration: none;">View All</a>
+                        <h2 class="section-title">On-Chain Activity</h2>
+                        <a href="#" data-tx-explorer target="_blank" rel="noopener" style="color: var(--accent); text-decoration: none; display:none;">View All <i class="fas fa-external-link-alt"></i></a>
                     </div>
-                    
-                    <div class="transaction-list">
-                        <div class="transaction-item">
-                            <div class="transaction-info">
-                                <div class="transaction-icon receive">
-                                    <i class="fas fa-arrow-down"></i>
-                                </div>
-                                <div class="transaction-details">
-                                    <div class="transaction-type">Deposit: BTC</div>
-                                    <div class="transaction-date">Today, 14:32</div>
-                                </div>
-                            </div>
-                            <div>
-                                <div class="transaction-amount transaction-receive">+0.125 BTC</div>
-                                <div class="transaction-status status-completed">Completed</div>
-                            </div>
-                        </div>
-                        
-                        <div class="transaction-item">
-                            <div class="transaction-info">
-                                <div class="transaction-icon send">
-                                    <i class="fas fa-arrow-up"></i>
-                                </div>
-                                <div class="transaction-details">
-                                    <div class="transaction-type">Sent: ETH</div>
-                                    <div class="transaction-date">Yesterday, 09:15</div>
-                                </div>
-                            </div>
-                            <div>
-                                <div class="transaction-amount transaction-send">-1.25 ETH</div>
-                                <div class="transaction-status status-completed">Completed</div>
-                            </div>
-                        </div>
-                        
+
+                    <div class="transaction-list" data-tx-list>
                         <div class="transaction-item">
                             <div class="transaction-info">
                                 <div class="transaction-icon swap">
-                                    <i class="fas fa-exchange-alt"></i>
+                                    <i class="fas fa-plug"></i>
                                 </div>
                                 <div class="transaction-details">
-                                    <div class="transaction-type">Swap: BTC to SOL</div>
-                                    <div class="transaction-date">Mar 12, 2023</div>
+                                    <div class="transaction-type">Connect your wallet</div>
+                                    <div class="transaction-date">On-chain activity appears here once connected</div>
                                 </div>
-                            </div>
-                            <div>
-                                <div class="transaction-amount transaction-send">-0.05 BTC</div>
-                                <div class="transaction-amount transaction-receive">+8.2 SOL</div>
-                            </div>
-                        </div>
-                        
-                        <div class="transaction-item">
-                            <div class="transaction-info">
-                                <div class="transaction-icon receive">
-                                    <i class="fas fa-arrow-down"></i>
-                                </div>
-                                <div class="transaction-details">
-                                    <div class="transaction-type">Deposit: USDC</div>
-                                    <div class="transaction-date">Mar 10, 2023</div>
-                                </div>
-                            </div>
-                            <div>
-                                <div class="transaction-amount transaction-receive">+500.00 USDC</div>
-                                <div class="transaction-status status-completed">Completed</div>
-                            </div>
-                        </div>
-                        
-                        <div class="transaction-item">
-                            <div class="transaction-info">
-                                <div class="transaction-icon send">
-                                    <i class="fas fa-arrow-up"></i>
-                                </div>
-                                <div class="transaction-details">
-                                    <div class="transaction-type">Withdrawal</div>
-                                    <div class="transaction-date">Mar 8, 2023</div>
-                                </div>
-                            </div>
-                            <div>
-                                <div class="transaction-amount transaction-send">-$1,200.00</div>
-                                <div class="transaction-status status-completed">Completed</div>
                             </div>
                         </div>
                     </div>
@@ -1169,6 +957,7 @@
                         if (eth) set('[data-eth-usd]', '≈ ' + window.CryptoHubAPI.format.usd(s.balance * eth.price));
                     });
                 }
+                renderOnChainActivity(s);
             } else {
                 set('[data-eth-balance]', 'Not connected');
                 set('[data-eth-usd]', 'Connect your wallet to view');
@@ -1178,7 +967,132 @@
                 set('[data-network-hint]', 'Not connected');
                 show('[data-explorer-link]', false);
                 show('[data-network-switch]', false);
+                resetOnChainActivity();
             }
+        }
+
+        // ---- On-chain activity (transaction count + explorer link) --
+        // A browser wallet can't fetch full tx history without an explorer
+        // API key, so we surface the on-chain nonce (total sent txs) and a
+        // deep link to the address on the current chain's explorer.
+        async function renderOnChainActivity(s) {
+            const W = window.CryptoHubWallet;
+            const list = document.querySelector('[data-tx-list]');
+            const viewAll = document.querySelector('[data-tx-explorer]');
+            if (viewAll) { viewAll.href = W.explorerAddressUrl(s.account); viewAll.style.display = ''; }
+            if (!list) return;
+            let count = 0;
+            try { count = await W.getTxCount(); } catch (e) { /* ignore */ }
+            const explorerHost = W.explorerAddressUrl(s.account).split('/address/')[0].replace('https://', '');
+            list.innerHTML = `
+                <div class="transaction-item">
+                    <div class="transaction-info">
+                        <div class="transaction-icon send"><i class="fas fa-paper-plane"></i></div>
+                        <div class="transaction-details">
+                            <div class="transaction-type">Transactions sent</div>
+                            <div class="transaction-date">Nonce on ${s.chainName || 'this chain'}</div>
+                        </div>
+                    </div>
+                    <div><div class="transaction-amount">${count}</div></div>
+                </div>
+                <div class="transaction-item">
+                    <div class="transaction-info">
+                        <div class="transaction-icon receive"><i class="fas fa-external-link-alt"></i></div>
+                        <div class="transaction-details">
+                            <div class="transaction-type">Full history</div>
+                            <div class="transaction-date">View on ${explorerHost}</div>
+                        </div>
+                    </div>
+                    <div><a href="${W.explorerAddressUrl(s.account)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;">Open <i class="fas fa-arrow-up-right-from-square"></i></a></div>
+                </div>`;
+        }
+
+        function resetOnChainActivity() {
+            const list = document.querySelector('[data-tx-list]');
+            const viewAll = document.querySelector('[data-tx-explorer]');
+            if (viewAll) viewAll.style.display = 'none';
+            if (list) list.innerHTML = `
+                <div class="transaction-item">
+                    <div class="transaction-info">
+                        <div class="transaction-icon swap"><i class="fas fa-plug"></i></div>
+                        <div class="transaction-details">
+                            <div class="transaction-type">Connect your wallet</div>
+                            <div class="transaction-date">On-chain activity appears here once connected</div>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        // ---- Assets table + allocation chart from the demo portfolio -
+        let walletAllocationChart = null;
+
+        function renderAssets(holdings, totalValue) {
+            const f = window.CryptoHubAPI.format;
+            const meta = window.CryptoHubAPI.COIN_META || {};
+            const body = document.querySelector('[data-assets-body]');
+            if (!body) return;
+            if (!holdings.length) {
+                body.innerHTML = '<tr class="asset-row"><td colspan="5" style="text-align:center;color:var(--secondary);padding:2rem;">No holdings tracked yet.</td></tr>';
+                return;
+            }
+            body.innerHTML = holdings.slice().sort((a, b) => b.value - a.value).map((h) => {
+                const icon = (meta[h.coinId] && meta[h.coinId].icon) || 'fas fa-coins';
+                const up = (h.change24h || 0) >= 0;
+                const changeCls = (h.change24h || 0) === 0 ? '' : (up ? 'positive' : 'negative');
+                return `
+                <tr class="asset-row">
+                    <td>
+                        <div class="asset-info">
+                            <div class="asset-icon"><i class="${icon}"></i></div>
+                            <div>
+                                <div class="asset-name">${h.name || h.coinId}</div>
+                                <div class="asset-symbol">${h.symbol || ''}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>${h.amount.toLocaleString('en-US', { maximumFractionDigits: 4 })}</td>
+                    <td>${f.usd(h.value)}</td>
+                    <td class="asset-change ${changeCls}">${f.percent(h.change24h)}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <div class="action-btn" title="Send"><i class="fas fa-arrow-up"></i></div>
+                            <div class="action-btn" title="Receive"><i class="fas fa-arrow-down"></i></div>
+                            <div class="action-btn" title="Swap"><i class="fas fa-exchange-alt"></i></div>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function renderAllocation(holdings, totalValue) {
+            if (!walletAllocationChart) return;
+            const sorted = holdings.slice().sort((a, b) => b.value - a.value);
+            walletAllocationChart.data.labels = sorted.map((h) => h.name || h.coinId);
+            walletAllocationChart.data.datasets[0].data = sorted.map((h) => totalValue > 0 ? (h.value / totalValue) * 100 : 0);
+            walletAllocationChart.update();
+        }
+
+        async function loadWalletPortfolio() {
+            const API = window.CryptoHubAPI;
+            if (!API) return;
+            let holdings, totalValue;
+            const data = await API.getPortfolio('demo');
+            if (data && data.holdings && data.holdings.length && data.live) {
+                holdings = data.holdings;
+                totalValue = data.totalValue;
+            } else {
+                // Static-file / offline fallback: build a demo portfolio from live prices.
+                const { coins } = await API.getMarkets(['bitcoin', 'ethereum', 'solana', 'cardano']);
+                const demoAmts = { bitcoin: 0.3542, ethereum: 4.82, solana: 45, cardano: 5200 };
+                holdings = coins.map((c) => ({
+                    coinId: c.id, name: c.name, symbol: c.symbol,
+                    amount: demoAmts[c.id] || 0, price: c.price,
+                    value: (demoAmts[c.id] || 0) * c.price, change24h: c.change24h
+                }));
+                totalValue = holdings.reduce((s, h) => s + h.value, 0);
+            }
+            renderAssets(holdings, totalValue);
+            renderAllocation(holdings, totalValue);
         }
 
         function initWalletPage() {
@@ -1216,14 +1130,14 @@
         // Initialize allocation chart
         document.addEventListener('DOMContentLoaded', function() {
             initWalletPage();
-            // Allocation chart
+            // Allocation chart — starts empty, populated from the portfolio.
             const allocationCtx = document.getElementById('allocationChart').getContext('2d');
-            new Chart(allocationCtx, {
+            walletAllocationChart = new Chart(allocationCtx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Bitcoin', 'Ethereum', 'Cardano', 'Solana', 'USDC', 'Other'],
+                    labels: [],
                     datasets: [{
-                        data: [45, 30, 12, 8, 3, 2],
+                        data: [],
                         backgroundColor: [
                             '#6c5ce7',
                             '#00cec9',
@@ -1252,7 +1166,7 @@
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    return `${context.label}: ${context.parsed}%`;
+                                    return `${context.label}: ${context.parsed.toFixed(1)}%`;
                                 }
                             }
                         }
@@ -1260,6 +1174,9 @@
                     cutout: '65%'
                 }
             });
+
+            // Load real holdings into the assets table + allocation chart.
+            loadWalletPortfolio();
         });
     </script>
 </body>
