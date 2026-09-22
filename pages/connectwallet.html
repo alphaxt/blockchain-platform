@@ -1130,6 +1130,30 @@
                                 if (window.CryptoHubApp) window.CryptoHubApp.toast('Error: ' + err.message, 'error');
                             }
                         }
+                    } else if (/walletconnect/i.test(name)) {
+                        // Real WalletConnect flow (mobile wallets via QR).
+                        if (!Wallet.walletConnectAvailable || !Wallet.walletConnectAvailable()) {
+                            if (window.CryptoHubApp) window.CryptoHubApp.toast('WalletConnect needs a project id — see README to enable it.', 'warning');
+                            return;
+                        }
+                        walletOptions.forEach((opt) => opt.classList.remove('connected'));
+                        this.classList.add('connected');
+                        if (status) status.textContent = 'Opening QR…';
+                        try {
+                            const s = await Wallet.connectWalletConnect();
+                            if (status) status.textContent = 'Connected!';
+                            reflect(s);
+                            if (window.CryptoHubApp) window.CryptoHubApp.toast('Connected: ' + Wallet.shorten(s.account), 'success');
+                            setTimeout(() => walletModal.classList.remove('active'), 800);
+                        } catch (err) {
+                            this.classList.remove('connected');
+                            if (status) status.textContent = original;
+                            if (err.code === 4001) {
+                                if (window.CryptoHubApp) window.CryptoHubApp.toast('Connection rejected', 'error');
+                            } else {
+                                if (window.CryptoHubApp) window.CryptoHubApp.toast('WalletConnect: ' + err.message, 'error');
+                            }
+                        }
                     } else {
                         if (window.CryptoHubApp) window.CryptoHubApp.toast(name + ' integration coming soon. MetaMask is live now.', 'info');
                     }

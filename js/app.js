@@ -53,6 +53,21 @@
     });
   }
 
+  async function connectWalletConnect() {
+    try {
+      const result = await Wallet.connectWalletConnect();
+      toast('Connected: ' + Wallet.shorten(result.account), 'success');
+    } catch (err) {
+      if (err.code === 'NO_WC_PROJECT') {
+        toast('WalletConnect not configured on this site.', 'warning');
+      } else if (err.code === 4001) {
+        toast('Connection request rejected.', 'error');
+      } else {
+        toast('WalletConnect error: ' + err.message, 'error');
+      }
+    }
+  }
+
   async function handleConnectClick() {
     if (!Wallet) return;
     const s = Wallet.getState();
@@ -61,11 +76,26 @@
       toast('Wallet disconnected', 'info');
       return;
     }
+    // Prefer an injected wallet (MetaMask). If none is present, fall back
+    // to WalletConnect (mobile) when it's configured; otherwise guide the
+    // user to install MetaMask.
+    if (Wallet.hasInjected && !Wallet.hasInjected()) {
+      if (Wallet.walletConnectAvailable && Wallet.walletConnectAvailable()) {
+        return connectWalletConnect();
+      }
+      toast('No wallet detected. Install MetaMask or scan with a mobile wallet.', 'warning');
+      window.open('https://metamask.io/download/', '_blank', 'noopener');
+      return;
+    }
     try {
       const result = await Wallet.connect();
       toast('Connected: ' + Wallet.shorten(result.account), 'success');
     } catch (err) {
       if (err.code === 'NO_PROVIDER') {
+        // No injected provider — try WalletConnect if available.
+        if (Wallet.walletConnectAvailable && Wallet.walletConnectAvailable()) {
+          return connectWalletConnect();
+        }
         toast('No wallet detected. Install MetaMask to connect.', 'warning');
         window.open('https://metamask.io/download/', '_blank', 'noopener');
       } else if (err.code === 4001) {
@@ -74,6 +104,14 @@
         toast('Wallet error: ' + err.message, 'error');
       }
     }
+  }
+
+  // Allow pages to trigger WalletConnect explicitly (e.g. a dedicated button).
+  function initWalletConnectButtons() {
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-walletconnect]');
+      if (btn) { e.preventDefault(); connectWalletConnect(); }
+    });
   }
 
   function initWallet() {
@@ -85,6 +123,7 @@
     });
     Wallet.restore();
     updateWalletButtons(Wallet.getState());
+    initWalletConnectButtons();
   }
 
   function setDataBadge(live, label) {
@@ -130,5 +169,5 @@
 
   document.addEventListener('DOMContentLoaded', initWallet);
 
-  global.CryptoHubApp = { toast, setDataBadge, updateWalletButtons, flashPrice };
+  global.CryptoHubApp = { toast, setDataBadge, updateWalletButtons, flashPrice, connectWalletConnect };
 })(window);

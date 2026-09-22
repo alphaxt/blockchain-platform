@@ -24,8 +24,41 @@
   const listeners = [];
   let state = { connected: false, account: null, chainId: null, chainName: null, balance: null };
 
-  function hasProvider() {
+  // The active EIP-1193 provider. Defaults to the injected wallet
+  // (MetaMask etc.); WalletConnect swaps in its own provider at runtime.
+  let activeProvider = (typeof global.ethereum !== 'undefined') ? global.ethereum : null;
+  let providerKind = activeProvider ? 'injected' : null; // 'injected' | 'walletconnect'
+
+  /** The provider all requests go through. Throws if none is available. */
+  function provider() {
+    if (!activeProvider) throw new Error('No Web3 wallet found.');
+    return activeProvider;
+  }
+
+  function hasInjected() {
     return typeof global.ethereum !== 'undefined';
+  }
+
+  function hasProvider() {
+    return !!activeProvider;
+  }
+
+  // Wire the standard EIP-1193 events on whichever provider is active.
+  function bindProviderEvents(p) {
+    if (!p || typeof p.on !== 'function') return;
+    p.on('accountsChanged', async (accounts) => {
+      if (!accounts || !accounts.length) return disconnect();
+      state.account = accounts[0];
+      localStorage.removeItem('cryptohub_session_token'); // token is bound to the old address
+      await refreshBalance();
+      emit();
+    });
+    p.on('chainChanged', async () => {
+      await syncChain();
+      await refreshBalance();
+      emit();
+    });
+    p.on('disconnect', () => disconnect());
   }
 
   function emit() {
@@ -47,7 +80,7 @@
   async function refreshBalance() {
     if (!hasProvider() || !state.account) return;
     try {
-      const balance = await global.ethereum.request({
+      const balance = await provider().request({
         method: 'eth_getBalance',
         params: [state.account, 'latest']
       });
@@ -60,23 +93,29 @@
   async function syncChain() {
     if (!hasProvider()) return;
     try {
-      const chainId = await global.ethereum.request({ method: 'eth_chainId' });
+      const chainId = await provider().request({ method: 'eth_chainId' });
       state.chainId = chainId;
       state.chainName = CHAINS[chainId] || ('Chain ' + parseInt(chainId, 16));
     } catch (e) { /* ignore */ }
   }
 
   /**
-   * Connect to the injected wallet. Prompts the user to select an account.
+   * Connect to the injected wallet (MetaMask etc.). Prompts the user to
+   * select an account.
    * @returns {Promise<object>} the resulting wallet state.
    */
   async function connect() {
-    if (!hasProvider()) {
+    if (!hasInjected()) {
       const err = new Error('No Web3 wallet found. Please install MetaMask.');
       err.code = 'NO_PROVIDER';
       throw err;
     }
-    const accounts = await global.ethereum.request({ method: 'eth_requestAccounts' });
+    // Ensure the injected provider is the active one (in case WC was used before).
+    activeProvider = global.ethereum;
+    providerKind = 'injected';
+    bindProviderEvents(activeProvider);
+
+    const accounts = await provider().request({ method: 'eth_requestAccounts' });
     if (!accounts || !accounts.length) throw new Error('No accounts authorized.');
 
     state.connected = true;
@@ -89,18 +128,28 @@
   }
 
   function disconnect() {
+    // Tear down a WalletConnect session if one is active.
+    if (providerKind === 'walletconnect' && activeProvider && typeof activeProvider.disconnect === 'function') {
+      try { activeProvider.disconnect(); } catch (e) { /* ignore */ }
+    }
+    // Reset the active provider back to the injected one (if present).
+    activeProvider = hasInjected() ? global.ethereum : null;
+    providerKind = activeProvider ? 'injected' : null;
     state = { connected: false, account: null, chainId: null, chainName: null, balance: null };
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem('cryptohub_session_token'); // end backend session too
     emit();
   }
 
-  /** Attempt to silently restore a prior connection on page load. */
+  /** Attempt to silently restore a prior injected connection on page load. */
   async function restore() {
-    if (!hasProvider() || localStorage.getItem(STORAGE_KEY) !== '1') return;
+    if (!hasInjected() || localStorage.getItem(STORAGE_KEY) !== '1') return;
     try {
-      const accounts = await global.ethereum.request({ method: 'eth_accounts' });
+      activeProvider = global.ethereum;
+      providerKind = 'injected';
+      const accounts = await provider().request({ method: 'eth_accounts' });
       if (accounts && accounts.length) {
+        bindProviderEvents(activeProvider);
         state.connected = true;
         state.account = accounts[0];
         await syncChain();
@@ -112,8 +161,7 @@
 
   /** Request the wallet switch to a given chain (adds if unknown). */
   async function switchChain(chainId) {
-    if (!hasProvider()) throw new Error('No Web3 wallet found.');
-    await global.ethereum.request({
+    await provider().request({
       method: 'wallet_switchEthereumChain',
       params: [{ chainId }]
     });
@@ -151,7 +199,7 @@
     const amt = Number(amountEth);
     if (isNaN(amt) || amt <= 0) throw new Error('Enter a valid amount.');
 
-    const txHash = await global.ethereum.request({
+    const txHash = await provider().request({
       method: 'eth_sendTransaction',
       params: [{ from: state.account, to, value: ethToWeiHex(amountEth) }]
     });
@@ -170,7 +218,7 @@
     if (!state.account) throw new Error('Connect a wallet first.');
     const hex = '0x' + Array.from(new TextEncoder().encode(message))
       .map((b) => b.toString(16).padStart(2, '0')).join('');
-    return global.ethereum.request({ method: 'personal_sign', params: [hex, state.account] });
+    return provider().request({ method: 'personal_sign', params: [hex, state.account] });
   }
 
   // --- Backend session (Sign-In With Ethereum) -----------------------
@@ -250,7 +298,7 @@
   async function getTxCount() {
     if (!hasProvider() || !state.account) return 0;
     try {
-      const hex = await global.ethereum.request({ method: 'eth_getTransactionCount', params: [state.account, 'latest'] });
+      const hex = await provider().request({ method: 'eth_getTransactionCount', params: [state.account, 'latest'] });
       return parseInt(hex, 16);
     } catch (e) { return 0; }
   }
@@ -303,7 +351,7 @@
     if (!state.account) throw new Error('Connect a wallet first.');
     const amt = Number(amountEth);
     if (isNaN(amt) || amt <= 0) throw new Error('Enter a valid amount.');
-    const txHash = await global.ethereum.request({
+    const txHash = await provider().request({
       method: 'eth_sendTransaction',
       params: [{ from: state.account, to: wethAddress(), value: ethToWeiHex(amountEth), data: WETH_SELECTORS.deposit }]
     });
@@ -323,7 +371,7 @@
     if (isNaN(amt) || amt <= 0) throw new Error('Enter a valid amount.');
     const amountWeiHex = ethToWeiHex(amountEth).slice(2); // strip 0x
     const data = WETH_SELECTORS.withdraw + pad32(amountWeiHex);
-    const txHash = await global.ethereum.request({
+    const txHash = await provider().request({
       method: 'eth_sendTransaction',
       params: [{ from: state.account, to: wethAddress(), data }]
     });
@@ -339,7 +387,7 @@
     if (!hasProvider() || !state.account) return 0;
     try {
       const data = WETH_SELECTORS.balanceOf + pad32(state.account.toLowerCase().replace(/^0x/, ''));
-      const hex = await global.ethereum.request({
+      const hex = await provider().request({
         method: 'eth_call',
         params: [{ to: wethAddress(), data }, 'latest']
       });
@@ -363,24 +411,88 @@
     throw new Error('Unknown swap direction: ' + direction);
   }
 
-  // React to wallet-level events.
-  if (hasProvider()) {
-    global.ethereum.on('accountsChanged', async (accounts) => {
-      if (!accounts.length) return disconnect();
-      state.account = accounts[0];
-      localStorage.removeItem('cryptohub_session_token'); // token is bound to the old address
-      await refreshBalance();
-      emit();
-    });
-    global.ethereum.on('chainChanged', async () => {
-      await syncChain();
-      await refreshBalance();
-      emit();
-    });
+  // --- WalletConnect (mobile wallets via QR / deep link) -------------
+  // Build-free integration: the @walletconnect/ethereum-provider SDK is
+  // lazy-loaded from a CDN as an ES module only when the user chooses
+  // WalletConnect, so the rest of the app stays dependency-free. Needs a
+  // free projectId from https://cloud.reown.com (formerly WalletConnect
+  // Cloud); set it via window.CRYPTOHUB_WC_PROJECT_ID or the <meta> tag
+  //   <meta name="walletconnect-project-id" content="...">
+  const WC_PROVIDER_URL = 'https://esm.sh/@walletconnect/ethereum-provider@2.21.8';
+  let wcProvider = null;
+
+  function walletConnectProjectId() {
+    if (global.CRYPTOHUB_WC_PROJECT_ID) return global.CRYPTOHUB_WC_PROJECT_ID;
+    const meta = document.querySelector('meta[name="walletconnect-project-id"]');
+    return (meta && meta.content) || '';
   }
+
+  /** Whether WalletConnect can be offered (a projectId is configured). */
+  function walletConnectAvailable() {
+    return !!walletConnectProjectId();
+  }
+
+  /**
+   * Connect via WalletConnect. Opens the QR modal so a mobile wallet can
+   * scan and pair. Returns the resulting wallet state.
+   */
+  async function connectWalletConnect() {
+    if (!location.protocol.startsWith('http')) {
+      throw new Error('WalletConnect requires the site to be served over http(s).');
+    }
+    const projectId = walletConnectProjectId();
+    if (!projectId) {
+      const err = new Error('WalletConnect is not configured. Set a project id (see docs).');
+      err.code = 'NO_WC_PROJECT';
+      throw err;
+    }
+    // Lazy-load the SDK once.
+    if (!wcProvider) {
+      const mod = await import(/* webpackIgnore: true */ WC_PROVIDER_URL);
+      const EthereumProvider = mod.EthereumProvider || (mod.default && mod.default.EthereumProvider) || mod.default;
+      wcProvider = await EthereumProvider.init({
+        projectId,
+        showQrModal: true,
+        // Chains we support switching to (mainnet + the L2s in CHAINS).
+        optionalChains: [1, 5, 11155111, 137, 56, 42161, 10],
+        metadata: {
+          name: 'CryptoHub',
+          description: 'CryptoHub — cryptocurrency platform',
+          url: location.origin,
+          icons: [location.origin + '/favicon.ico']
+        }
+      });
+    }
+    // Opens the QR modal and resolves once a wallet pairs.
+    const accounts = await wcProvider.enable();
+    if (!accounts || !accounts.length) throw new Error('No accounts authorized.');
+
+    activeProvider = wcProvider;
+    providerKind = 'walletconnect';
+    bindProviderEvents(activeProvider);
+
+    state.connected = true;
+    state.account = accounts[0];
+    await syncChain();
+    await refreshBalance();
+    localStorage.setItem(STORAGE_KEY, '1');
+    emit();
+    return Object.assign({}, state);
+  }
+
+  /** Which kind of provider is currently connected ('injected'|'walletconnect'|null). */
+  function connectionKind() {
+    return state.connected ? providerKind : null;
+  }
+
+  // React to events on the initially-injected provider (if present).
+  bindProviderEvents(activeProvider);
 
   global.CryptoHubWallet = {
     connect,
+    connectWalletConnect,
+    walletConnectAvailable,
+    connectionKind,
     disconnect,
     restore,
     switchChain,
@@ -401,6 +513,7 @@
     explorerTxUrl,
     onChange,
     hasProvider,
+    hasInjected,
     shorten,
     getState: () => Object.assign({}, state),
     CHAINS,
