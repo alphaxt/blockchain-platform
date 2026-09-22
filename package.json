@@ -1,0 +1,28 @@
+{
+  "name": "cryptohub-blockchain-platform",
+  "version": "1.0.0",
+  "description": "CryptoHub — a full-stack cryptocurrency platform with a static frontend, live CoinGecko market data, Web3 wallet integration, and a lightweight Express API backend.",
+  "type": "commonjs",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "cryptocurrency",
+    "blockchain",
+    "web3",
+    "metamask",
+    "coingecko",
+    "express",
+    "crypto-dashboard"
+  ],
+  "author": "Muhammad Danish",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.22.3"
+  }
+}

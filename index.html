@@ -6,7 +6,11 @@
     <title>CryptoHub | Modern Cryptocurrency Platform</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/shared.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="js/api.js" defer></script>
+    <script src="js/wallet.js" defer></script>
+    <script src="js/app.js" defer></script>
     <style>
         :root {
             --primary: #6c5ce7;
@@ -808,9 +812,7 @@
         </div>
         
         <div class="user-actions">
-            <a href="pages/connectwallet.html" style="text-decoration: none;">
-                <button class="btn btn-outline">Connect Wallet</button>
-            </a>
+            <button class="btn btn-outline" data-connect-wallet data-label="Connect Wallet">Connect Wallet</button>
             <div class="user-profile">
                 <a href="pages/profile.html" style="text-decoration: none; color: inherit;">
                     <div class="avatar">JD</div>
@@ -853,6 +855,7 @@
             <h2 class="section-title">
                 <i class="fas fa-fire"></i>
                 Trending Cryptocurrencies
+                <span class="live-badge" data-live-badge style="margin-left:auto;font-size:0.9rem;">● Connecting…</span>
             </h2>
             
             <div class="trending-coins">
@@ -867,8 +870,8 @@
                             <div class="coin-symbol">BTC</div>
                         </div>
                     </div>
-                    <div class="coin-price">$61,842.75</div>
-                    <div class="coin-change positive">+3.2%</div>
+                    <div class="coin-price" data-price="bitcoin">$61,842.75</div>
+                    <div class="coin-change positive" data-change="bitcoin">+3.2%</div>
                     <div class="coin-chart">
                         <canvas id="btcChart"></canvas>
                     </div>
@@ -885,8 +888,8 @@
                             <div class="coin-symbol">ETH</div>
                         </div>
                     </div>
-                    <div class="coin-price">$3,412.56</div>
-                    <div class="coin-change positive">+1.8%</div>
+                    <div class="coin-price" data-price="ethereum">$3,412.56</div>
+                    <div class="coin-change positive" data-change="ethereum">+1.8%</div>
                     <div class="coin-chart">
                         <canvas id="ethChart"></canvas>
                     </div>
@@ -903,8 +906,8 @@
                             <div class="coin-symbol">ADA</div>
                         </div>
                     </div>
-                    <div class="coin-price">$0.4621</div>
-                    <div class="coin-change negative">-0.7%</div>
+                    <div class="coin-price" data-price="cardano">$0.4621</div>
+                    <div class="coin-change negative" data-change="cardano">-0.7%</div>
                     <div class="coin-chart">
                         <canvas id="adaChart"></canvas>
                     </div>
@@ -921,8 +924,8 @@
                             <div class="coin-symbol">SOL</div>
                         </div>
                     </div>
-                    <div class="coin-price">$142.35</div>
-                    <div class="coin-change positive">+5.6%</div>
+                    <div class="coin-price" data-price="solana">$142.35</div>
+                    <div class="coin-change positive" data-change="solana">+5.6%</div>
                     <div class="coin-chart">
                         <canvas id="solChart"></canvas>
                     </div>
@@ -1138,121 +1141,40 @@
     </div>
 
     <script>
-        // Coin database
-        const coins = [
-            {
-                id: 'bitcoin',
-                name: 'Bitcoin',
-                symbol: 'BTC',
-                icon: 'fab fa-bitcoin',
-                price: '$61,842.75',
-                change: '+3.2%',
-                changeClass: 'positive',
-                marketCap: '$1.2 Trillion',
-                volume: '$42.5 Billion',
-                supply: '19.6 Million BTC',
-                ath: '$69,044.77',
-                description: 'Bitcoin is the first decentralized cryptocurrency. Nodes in the peer-to-peer bitcoin network verify transactions through cryptography and record them in a public distributed ledger, called a blockchain.'
-            },
-            {
-                id: 'ethereum',
-                name: 'Ethereum',
-                symbol: 'ETH',
-                icon: 'fab fa-ethereum',
-                price: '$3,412.56',
-                change: '+1.8%',
-                changeClass: 'positive',
-                marketCap: '$408.7 Billion',
-                volume: '$18.3 Billion',
-                supply: '122.4 Million ETH',
-                ath: '$4,891.70',
-                description: 'Ethereum is a decentralized, open-source blockchain with smart contract functionality. Ether is the native cryptocurrency of the platform. It is the second-largest cryptocurrency by market capitalization.'
-            },
-            {
-                id: 'cardano',
-                name: 'Cardano',
-                symbol: 'ADA',
-                icon: 'fas fa-chart-line',
-                price: '$0.4621',
-                change: '-0.7%',
-                changeClass: 'negative',
-                marketCap: '$16.4 Billion',
-                volume: '$340 Million',
-                supply: '35.5 Billion ADA',
-                ath: '$3.10',
-                description: 'Cardano is a proof-of-stake blockchain platform that says its goal is to allow "changemakers, innovators, and visionaries" to bring about positive global change.'
-            },
-            {
-                id: 'solana',
-                name: 'Solana',
-                symbol: 'SOL',
-                icon: 'fas fa-bolt',
-                price: '$142.35',
-                change: '+5.6%',
-                changeClass: 'positive',
-                marketCap: '$63.2 Billion',
-                volume: '$2.8 Billion',
-                supply: '444.1 Million SOL',
-                ath: '$260.06',
-                description: 'Solana is a public blockchain platform with smart contract functionality. Its native cryptocurrency is SOL. Solana is known for its fast transaction speeds and low fees.'
-            },
-            {
-                id: 'ripple',
-                name: 'Ripple',
-                symbol: 'XRP',
-                icon: 'fas fa-waves',
-                price: '$0.5328',
-                change: '+0.9%',
-                changeClass: 'positive',
-                marketCap: '$29.3 Billion',
-                volume: '$1.2 Billion',
-                supply: '55.0 Billion XRP',
-                ath: '$3.84',
-                description: 'Ripple is a real-time gross settlement system, currency exchange and remittance network created by Ripple Labs Inc., a US-based technology company.'
-            },
-            {
-                id: 'dogecoin',
-                name: 'Dogecoin',
-                symbol: 'DOGE',
-                icon: 'fas fa-dog',
-                price: '$0.1285',
-                change: '+2.4%',
-                changeClass: 'positive',
-                marketCap: '$18.5 Billion',
-                volume: '$890 Million',
-                supply: '144.2 Billion DOGE',
-                ath: '$0.7376',
-                description: 'Dogecoin is a cryptocurrency created by software engineers Billy Markus and Jackson Palmer, who decided to create a payment system as a joke, making fun of the wild speculation in cryptocurrencies at the time.'
-            },
-            {
-                id: 'polkadot',
-                name: 'Polkadot',
-                symbol: 'DOT',
-                icon: 'fas fa-circle-nodes',
-                price: '$6.89',
-                change: '-1.2%',
-                changeClass: 'negative',
-                marketCap: '$9.8 Billion',
-                volume: '$240 Million',
-                supply: '1.4 Billion DOT',
-                ath: '$55.00',
-                description: 'Polkadot is a blockchain platform and cryptocurrency. It is designed to support various interconnected, application-specific sub-chains called parachains.'
-            },
-            {
-                id: 'litecoin',
-                name: 'Litecoin',
-                symbol: 'LTC',
-                icon: 'fas fa-coins',
-                price: '$78.42',
-                change: '+0.4%',
-                changeClass: 'positive',
-                marketCap: '$5.8 Billion',
-                volume: '$420 Million',
-                supply: '74.3 Million LTC',
-                ath: '$412.96',
-                description: 'Litecoin is a peer-to-peer cryptocurrency and open-source software project released under the MIT/X11 license. Creation and transfer of coins is based on an open source cryptographic protocol.'
-            }
-        ];
+        // Short human descriptions keyed by coin id (merged onto live API data).
+        const COIN_DESCRIPTIONS = {
+            bitcoin: 'Bitcoin is the first decentralized cryptocurrency. Nodes in the peer-to-peer bitcoin network verify transactions through cryptography and record them in a public distributed ledger, called a blockchain.',
+            ethereum: 'Ethereum is a decentralized, open-source blockchain with smart contract functionality. Ether is its native cryptocurrency and the second-largest by market capitalization.',
+            cardano: 'Cardano is a proof-of-stake blockchain platform whose stated goal is to enable changemakers and innovators to bring about positive global change.',
+            solana: 'Solana is a public blockchain platform with smart contract functionality, known for fast transaction speeds and low fees.',
+            ripple: 'Ripple is a real-time gross settlement system, currency exchange and remittance network created by Ripple Labs Inc.',
+            dogecoin: 'Dogecoin is a cryptocurrency created as a joke that grew into a widely traded asset with an active community.',
+            polkadot: 'Polkadot is a blockchain platform designed to support interconnected, application-specific sub-chains called parachains.',
+            litecoin: 'Litecoin is a peer-to-peer cryptocurrency and open-source project released under the MIT/X11 license.'
+        };
+
+        // Populated from the live API (window.CryptoHubAPI). Starts empty; the
+        // static markup shown above acts as the visible fallback until data loads.
+        let coins = [];
+
+        // Build the modal-friendly view model from a raw API coin record.
+        function toViewModel(c) {
+            const fmt = window.CryptoHubAPI.format;
+            return {
+                id: c.id,
+                name: c.name,
+                symbol: c.symbol,
+                icon: c.icon,
+                price: fmt.usd(c.price),
+                change: fmt.percent(c.change24h),
+                changeClass: (c.change24h >= 0) ? 'positive' : 'negative',
+                marketCap: fmt.compact(c.marketCap),
+                volume: fmt.compact(c.volume),
+                supply: (c.supply ? Math.round(c.supply).toLocaleString('en-US') + ' ' + c.symbol : '--'),
+                ath: fmt.usd(c.ath),
+                description: COIN_DESCRIPTIONS[c.id] || (c.name + ' is a digital asset tracked on CryptoHub.')
+            };
+        }
 
         // DOM elements
         const searchInput = document.getElementById('searchInput');
@@ -1351,8 +1273,10 @@
             for (let i = 0; i < 30; i++) {
                 chartData.push(Math.random() * 100 + (coin.changeClass === 'positive' ? 300 : 200));
             }
-            
-            new Chart(chartCtx, {
+
+            // Destroy any previous chart bound to this canvas to avoid stacking.
+            if (window._modalChart) window._modalChart.destroy();
+            window._modalChart = new Chart(chartCtx, {
                 type: 'line',
                 data: {
                     labels: Array(30).fill(''),
@@ -1402,8 +1326,10 @@
 
         // Add event listeners to coin cards
         document.querySelectorAll('.coin-card').forEach(card => {
-            card.addEventListener('click', function() {
+            card.addEventListener('click', async function() {
                 const coinId = this.getAttribute('data-coin');
+                // Ensure live data is loaded before opening the modal.
+                if (!coins.length) await loadLiveMarkets();
                 const coin = coins.find(c => c.id === coinId);
                 if (coin) showCoinDetails(coin);
             });
@@ -1542,7 +1468,35 @@
                     }
                 });
             });
+
+            // ---- Live market data wiring ---------------------------------
+            loadLiveMarkets();
+            // Refresh every 60s so the numbers stay reasonably current.
+            setInterval(loadLiveMarkets, 60000);
         });
-    </script>
+
+        // Fetch live prices and update the trending cards + coin database.
+        async function loadLiveMarkets() {
+            if (!window.CryptoHubAPI) return;
+            try {
+                const { coins: raw, live } = await window.CryptoHubAPI.getMarkets();
+                coins = raw.map(toViewModel);
+                if (window.CryptoHubApp) window.CryptoHubApp.setDataBadge(live);
+
+                const fmt = window.CryptoHubAPI.format;
+                raw.forEach((c) => {
+                    const priceEl = document.querySelector(`[data-price="${c.id}"]`);
+                    const changeEl = document.querySelector(`[data-change="${c.id}"]`);
+                    if (priceEl) priceEl.textContent = fmt.usd(c.price);
+                    if (changeEl) {
+                        changeEl.textContent = fmt.percent(c.change24h);
+                        changeEl.className = 'coin-change ' + (c.change24h >= 0 ? 'positive' : 'negative');
+                    }
+                });
+            } catch (err) {
+                console.warn('[CryptoHub] loadLiveMarkets failed:', err);
+                if (window.CryptoHubApp) window.CryptoHubApp.setDataBadge(false);
+            }
+        }
 </body>
 </html>
