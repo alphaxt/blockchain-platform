@@ -87,14 +87,48 @@
     updateWalletButtons(Wallet.getState());
   }
 
-  function setDataBadge(live) {
+  function setDataBadge(live, label) {
     document.querySelectorAll('[data-live-badge]').forEach((el) => {
-      el.textContent = live ? '● Live' : '● Offline (cached)';
+      el.textContent = label || (live ? '● Live' : '● Offline (cached)');
       el.style.color = live ? '#00b894' : '#fdcb6e';
     });
   }
 
+  // Inject the flash keyframes once.
+  function ensureFlashStyles() {
+    if (document.getElementById('ch-flash-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'ch-flash-styles';
+    style.textContent =
+      '@keyframes ch-flash-up{0%{background:rgba(0,184,148,.45)}100%{background:transparent}}' +
+      '@keyframes ch-flash-down{0%{background:rgba(255,118,117,.45)}100%{background:transparent}}' +
+      '.ch-up{animation:ch-flash-up .7s ease}.ch-down{animation:ch-flash-down .7s ease}' +
+      '.ch-tick{transition:color .2s ease}';
+    document.head.appendChild(style);
+  }
+
+  /**
+   * Update a price element with a brief green/red flash based on direction.
+   * @param {Element} el target element
+   * @param {number} newPrice new numeric price
+   * @param {string} text formatted price string to display
+   */
+  function flashPrice(el, newPrice, text) {
+    if (!el) return;
+    ensureFlashStyles();
+    const prev = parseFloat(el.dataset.rawPrice);
+    el.dataset.rawPrice = String(newPrice);
+    el.textContent = text;
+    if (!isNaN(prev) && prev !== newPrice) {
+      const cls = newPrice > prev ? 'ch-up' : 'ch-down';
+      el.classList.remove('ch-up', 'ch-down');
+      // Force reflow so the animation restarts on rapid ticks.
+      void el.offsetWidth;
+      el.classList.add(cls);
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', initWallet);
 
-  global.CryptoHubApp = { toast, setDataBadge, updateWalletButtons };
+  global.CryptoHubApp = { toast, setDataBadge, updateWalletButtons, flashPrice };
 })(window);

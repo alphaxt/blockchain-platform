@@ -6,7 +6,12 @@
     <title>CryptoHub Markets | Track Cryptocurrency Prices & Trends</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/shared.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="../js/api.js" defer></script>
+    <script src="../js/realtime.js" defer></script>
+    <script src="../js/wallet.js" defer></script>
+    <script src="../js/app.js" defer></script>
     <style>
         :root {
             --primary: #6c5ce7;
@@ -668,9 +673,7 @@
         </div>
         
        <div class="user-actions">
-    <a href="connectwallet.html" style="text-decoration: none;">
-        <button class="btn btn-outline">Connect Wallet</button>
-    </a>
+    <button class="btn btn-outline" data-connect-wallet data-label="Connect Wallet">Connect Wallet</button>
     <div class="user-profile">
         <a href="profile.html" style="text-decoration: none; color: inherit;">
             <div class="avatar">JD</div>
@@ -686,31 +689,32 @@
             <h2 class="section-title">
                 <i class="fas fa-chart-line"></i>
                 Market Overview
+                <span class="live-badge" data-live-badge style="margin-left:auto;font-size:0.9rem;">● Connecting…</span>
             </h2>
             
             <div class="overview-grid">
                 <div class="overview-card">
                     <div class="overview-title">Global Market Cap</div>
-                    <div class="overview-value">$2.36T</div>
-                    <div class="overview-change positive">+2.4% <i class="fas fa-arrow-up"></i></div>
+                    <div class="overview-value" data-global="marketCap">$2.36T</div>
+                    <div class="overview-change positive" data-global="marketCapChange">+2.4% <i class="fas fa-arrow-up"></i></div>
                 </div>
                 
                 <div class="overview-card">
                     <div class="overview-title">24h Volume</div>
-                    <div class="overview-value">$98.5B</div>
-                    <div class="overview-change negative">-1.2% <i class="fas fa-arrow-down"></i></div>
+                    <div class="overview-value" data-global="volume">$98.5B</div>
+                    <div class="overview-change">Live</div>
                 </div>
                 
                 <div class="overview-card">
                     <div class="overview-title">Bitcoin Dominance</div>
-                    <div class="overview-value">48.3%</div>
-                    <div class="overview-change positive">+0.6% <i class="fas fa-arrow-up"></i></div>
+                    <div class="overview-value" data-global="btcDominance">48.3%</div>
+                    <div class="overview-change">of total market cap</div>
                 </div>
                 
                 <div class="overview-card">
-                    <div class="overview-title">Fear & Greed Index</div>
-                    <div class="overview-value">74 <span style="color: var(--success);">Greed</span></div>
-                    <div class="overview-change">Neutral: 50</div>
+                    <div class="overview-title">Fear &amp; Greed Index</div>
+                    <div class="overview-value" data-fng-value>--</div>
+                    <div class="overview-change" data-fng-label>Loading…</div>
                 </div>
             </div>
         </section>
@@ -764,10 +768,10 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="price-cell">$61,842.75</td>
-                        <td class="change-cell positive">+3.2%</td>
-                        <td>$38.2B</td>
-                        <td>$1.19T</td>
+                        <td class="price-cell" data-price="bitcoin">$61,842.75</td>
+                        <td class="change-cell positive" data-change="bitcoin">+3.2%</td>
+                        <td data-volume="bitcoin">$38.2B</td>
+                        <td data-mcap="bitcoin">$1.19T</td>
                         <td class="chart-cell">
                             <div class="mini-chart">
                                 <canvas id="btcChart"></canvas>
@@ -791,10 +795,10 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="price-cell">$3,412.56</td>
-                        <td class="change-cell positive">+1.8%</td>
-                        <td>$21.5B</td>
-                        <td>$409.2B</td>
+                        <td class="price-cell" data-price="ethereum">$3,412.56</td>
+                        <td class="change-cell positive" data-change="ethereum">+1.8%</td>
+                        <td data-volume="ethereum">$21.5B</td>
+                        <td data-mcap="ethereum">$409.2B</td>
                         <td class="chart-cell">
                             <div class="mini-chart">
                                 <canvas id="ethChart"></canvas>
@@ -818,10 +822,10 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="price-cell">$1.00</td>
-                        <td class="change-cell">0.0%</td>
-                        <td>$68.3B</td>
-                        <td>$112.4B</td>
+                        <td class="price-cell" data-price="tether">$1.00</td>
+                        <td class="change-cell" data-change="tether">0.0%</td>
+                        <td data-volume="tether">$68.3B</td>
+                        <td data-mcap="tether">$112.4B</td>
                         <td class="chart-cell">
                             <div class="mini-chart">
                                 <canvas id="usdtChart"></canvas>
@@ -845,10 +849,10 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="price-cell">$585.32</td>
-                        <td class="change-cell negative">-0.4%</td>
-                        <td>$1.8B</td>
-                        <td>$89.7B</td>
+                        <td class="price-cell" data-price="binancecoin">$585.32</td>
+                        <td class="change-cell negative" data-change="binancecoin">-0.4%</td>
+                        <td data-volume="binancecoin">$1.8B</td>
+                        <td data-mcap="binancecoin">$89.7B</td>
                         <td class="chart-cell">
                             <div class="mini-chart">
                                 <canvas id="bnbChart"></canvas>
@@ -872,10 +876,10 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="price-cell">$142.35</td>
-                        <td class="change-cell positive">+5.6%</td>
-                        <td>$3.2B</td>
-                        <td>$63.8B</td>
+                        <td class="price-cell" data-price="solana">$142.35</td>
+                        <td class="change-cell positive" data-change="solana">+5.6%</td>
+                        <td data-volume="solana">$3.2B</td>
+                        <td data-mcap="solana">$63.8B</td>
                         <td class="chart-cell">
                             <div class="mini-chart">
                                 <canvas id="solChart"></canvas>
@@ -899,10 +903,10 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="price-cell">$0.4621</td>
-                        <td class="change-cell negative">-0.7%</td>
-                        <td>$0.8B</td>
-                        <td>$16.4B</td>
+                        <td class="price-cell" data-price="cardano">$0.4621</td>
+                        <td class="change-cell negative" data-change="cardano">-0.7%</td>
+                        <td data-volume="cardano">$0.8B</td>
+                        <td data-mcap="cardano">$16.4B</td>
                         <td class="chart-cell">
                             <div class="mini-chart">
                                 <canvas id="adaChart"></canvas>
@@ -926,10 +930,10 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="price-cell">$0.5213</td>
-                        <td class="change-cell positive">+1.1%</td>
-                        <td>$1.2B</td>
-                        <td>$28.7B</td>
+                        <td class="price-cell" data-price="ripple">$0.5213</td>
+                        <td class="change-cell positive" data-change="ripple">+1.1%</td>
+                        <td data-volume="ripple">$1.2B</td>
+                        <td data-mcap="ripple">$28.7B</td>
                         <td class="chart-cell">
                             <div class="mini-chart">
                                 <canvas id="xrpChart"></canvas>
@@ -1210,70 +1214,149 @@
     </footer>
 
     <script>
-        // Initialize charts
-        document.addEventListener('DOMContentLoaded', function() {
-            // Coin charts
-            const coinCharts = [
-                { id: 'btcChart', color: '#00cec9', direction: 'up' },
-                { id: 'ethChart', color: '#a29bfe', direction: 'up' },
-                { id: 'usdtChart', color: '#00b894', direction: 'flat' },
-                { id: 'bnbChart', color: '#fdcb6e', direction: 'down' },
-                { id: 'solChart', color: '#6c5ce7', direction: 'up' },
-                { id: 'adaChart', color: '#ff7675', direction: 'down' },
-                { id: 'xrpChart', color: '#0984e3', direction: 'up' }
-            ];
-            
-            coinCharts.forEach(chartInfo => {
-                const ctx = document.getElementById(chartInfo.id).getContext('2d');
-                const data = [];
-                const count = 7;
-                
-                // Generate appropriate data based on direction
-                let base = Math.random() * 30 + 10;
-                for(let i = 0; i < count; i++) {
-                    if (chartInfo.direction === 'up') {
-                        base += Math.random() * 5;
-                        data.push(base);
-                    } else if (chartInfo.direction === 'down') {
-                        base -= Math.random() * 5;
-                        data.push(base);
-                    } else {
-                        data.push(base + (Math.random() * 4 - 2));
-                    }
+        // Maps each table row's coin id to its sparkline canvas + accent color.
+        const ROW_COINS = [
+            { id: 'bitcoin',     canvas: 'btcChart',  color: '#00cec9' },
+            { id: 'ethereum',    canvas: 'ethChart',  color: '#a29bfe' },
+            { id: 'tether',      canvas: 'usdtChart', color: '#00b894' },
+            { id: 'binancecoin', canvas: 'bnbChart',  color: '#fdcb6e' },
+            { id: 'solana',      canvas: 'solChart',  color: '#6c5ce7' },
+            { id: 'cardano',     canvas: 'adaChart',  color: '#ff7675' },
+            { id: 'ripple',      canvas: 'xrpChart',  color: '#0984e3' }
+        ];
+
+        function renderSparkline(canvasId, prices, color) {
+            const el = document.getElementById(canvasId);
+            if (!el) return;
+            new Chart(el.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: prices.map(() => ''),
+                    datasets: [{
+                        data: prices,
+                        borderColor: color,
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.3,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { display: false }, x: { display: false } }
                 }
-                
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: Array(count).fill(''),
-                        datasets: [{
-                            data: data,
-                            borderColor: chartInfo.color,
-                            borderWidth: 2,
-                            pointRadius: 0,
-                            tension: 0.3,
-                            fill: false
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        },
-                        scales: {
-                            y: {
-                                display: false
-                            },
-                            x: {
-                                display: false
-                            }
-                        }
-                    }
-                });
             });
+        }
+
+        // 1) Global market overview stats.
+        async function loadGlobal() {
+            if (!window.CryptoHubAPI) return;
+            const fmt = window.CryptoHubAPI.format;
+            try {
+                const g = await window.CryptoHubAPI.getGlobal();
+                const set = (key, text) => {
+                    const el = document.querySelector(`[data-global="${key}"]`);
+                    if (el) el.textContent = text;
+                };
+                set('marketCap', fmt.compact(g.marketCap));
+                set('volume', fmt.compact(g.volume));
+                set('btcDominance', g.btcDominance.toFixed(1) + '%');
+                const changeEl = document.querySelector('[data-global="marketCapChange"]');
+                if (changeEl) {
+                    const up = g.marketCapChange >= 0;
+                    changeEl.className = 'overview-change ' + (up ? 'positive' : 'negative');
+                    changeEl.innerHTML = fmt.percent(g.marketCapChange) +
+                        ` <i class="fas fa-arrow-${up ? 'up' : 'down'}"></i>`;
+                }
+                if (window.CryptoHubApp) window.CryptoHubApp.setDataBadge(g.live, g.live ? '● Live' : '● Offline (cached)');
+            } catch (e) { /* ignore */ }
+        }
+
+        // 2) Fear & Greed index (free alternative.me API).
+        async function loadFearGreed() {
+            const valEl = document.querySelector('[data-fng-value]');
+            const labelEl = document.querySelector('[data-fng-label]');
+            try {
+                const res = await fetch('https://api.alternative.me/fng/');
+                const data = await res.json();
+                const item = data.data && data.data[0];
+                if (item && valEl) {
+                    const colors = { 'Extreme Fear': '#ff7675', 'Fear': '#fdcb6e', 'Neutral': '#a29bfe', 'Greed': '#00b894', 'Extreme Greed': '#00cec9' };
+                    valEl.innerHTML = item.value +
+                        ` <span style="color:${colors[item.value_classification] || 'var(--accent)'}">${item.value_classification}</span>`;
+                    if (labelEl) labelEl.textContent = 'Updated ' + new Date(item.timestamp * 1000).toLocaleDateString();
+                }
+            } catch (e) {
+                if (valEl) valEl.textContent = '--';
+                if (labelEl) labelEl.textContent = 'Unavailable';
+            }
+        }
+
+        // 3) Snapshot for volume / market cap columns + sparklines.
+        async function loadSnapshot() {
+            if (!window.CryptoHubAPI) return;
+            const fmt = window.CryptoHubAPI.format;
+            const ids = ROW_COINS.map((r) => r.id);
+            const { coins } = await window.CryptoHubAPI.getMarkets(ids);
+            const byId = {};
+            coins.forEach((c) => { byId[c.id] = c; });
+
+            ROW_COINS.forEach((row) => {
+                const c = byId[row.id];
+                if (!c) { renderSparkline(row.canvas, Array.from({ length: 7 }, () => Math.random()), row.color); return; }
+                const volEl = document.querySelector(`[data-volume="${row.id}"]`);
+                const mcapEl = document.querySelector(`[data-mcap="${row.id}"]`);
+                const priceEl = document.querySelector(`[data-price="${row.id}"]`);
+                const changeEl = document.querySelector(`[data-change="${row.id}"]`);
+                if (volEl) volEl.textContent = fmt.compact(c.volume);
+                if (mcapEl) mcapEl.textContent = fmt.compact(c.marketCap);
+                if (priceEl) { priceEl.dataset.rawPrice = String(c.price); priceEl.textContent = fmt.usd(c.price); }
+                if (changeEl && c.change24h != null) {
+                    changeEl.textContent = fmt.percent(c.change24h);
+                    changeEl.className = 'change-cell ' + (c.change24h >= 0 ? 'positive' : 'negative');
+                }
+            });
+
+            // Real 7-day sparklines (sequential to be gentle on rate limits).
+            for (const row of ROW_COINS) {
+                try {
+                    const prices = await window.CryptoHubAPI.getSparkline(row.id, 7);
+                    renderSparkline(row.canvas, prices.length ? prices : [1, 1], row.color);
+                } catch (e) {
+                    renderSparkline(row.canvas, Array.from({ length: 7 }, () => Math.random()), row.color);
+                }
+            }
+        }
+
+        // 4) Real-time price streaming into the table.
+        function startRealtime() {
+            if (!window.CryptoHubRealtime) return;
+            const ids = ROW_COINS.map((r) => r.id).filter((id) => window.CryptoHubRealtime.supported(id));
+            window.CryptoHubRealtime.start(ids);
+            window.CryptoHubRealtime.subscribe((tick) => {
+                const fmt = window.CryptoHubAPI.format;
+                const priceEl = document.querySelector(`[data-price="${tick.id}"]`);
+                const changeEl = document.querySelector(`[data-change="${tick.id}"]`);
+                if (priceEl && window.CryptoHubApp) window.CryptoHubApp.flashPrice(priceEl, tick.price, fmt.usd(tick.price));
+                if (changeEl && tick.changePercent != null) {
+                    changeEl.textContent = fmt.percent(tick.changePercent);
+                    changeEl.className = 'change-cell ' + (tick.changePercent >= 0 ? 'positive' : 'negative');
+                }
+                if (window.CryptoHubApp) {
+                    window.CryptoHubApp.setDataBadge(true, window.CryptoHubRealtime.isFallback() ? '● Live (polling)' : '● Live');
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadGlobal();
+            loadFearGreed();
+            loadSnapshot().then(startRealtime);
+            setInterval(loadGlobal, 60000);
+            setInterval(loadFearGreed, 300000);
         });
     </script>
 </body>

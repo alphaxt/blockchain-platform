@@ -23,10 +23,13 @@ You can run it two ways:
 - **Blog & Community**, **API Docs**, **Help / FAQ**, **Profile**, **Legal & Privacy**
 - Responsive design, dark theme, accessible helpers
 
-**Live data**
-- Real-time prices, 24h change, market cap, volume, supply, and ATH from the CoinGecko API
-- Auto-refresh every 60s with a live/offline status badge
-- Graceful fallback to a static snapshot so the UI never breaks
+**Live & real-time data**
+- **Real-time price streaming** via Binance's public WebSocket (no API key) — sub-second ticks with green/red flash animation on the homepage and markets table
+- REST market data (price, 24h change, market cap, volume, supply, ATH) from CoinGecko
+- Live **global market stats** (total market cap, 24h volume, BTC dominance) and the **Fear & Greed Index**
+- Real **7-day sparkline** charts per coin
+- A live/offline status badge that reflects streaming vs. polling vs. cached mode
+- Automatic fallback chain: WebSocket → REST polling → static snapshot, so the UI never breaks
 
 **Web3 wallet**
 - Real MetaMask / EIP-1193 connection (`eth_requestAccounts`)
@@ -65,8 +68,9 @@ blockchain-platform/
 │   └── shared.css          # Shared design tokens + utility classes
 ├── js/
 │   ├── api.js              # Market data service (backend → CoinGecko → fallback)
+│   ├── realtime.js         # Real-time price stream (Binance WebSocket + polling fallback)
 │   ├── wallet.js           # Web3 / MetaMask wallet module
-│   └── app.js              # Shared bootstrap (connect button, toasts, badges)
+│   └── app.js              # Shared bootstrap (connect button, toasts, badges, price flash)
 ├── server/
 │   └── index.js            # Express API + static host
 ├── package.json            # Scripts + dependencies
@@ -113,10 +117,19 @@ Then visit `http://localhost:3000`. The frontend automatically prefers the local
 |--------|------------------------------|-----------------------------------|
 | GET    | `/api/health`                | Service status                    |
 | GET    | `/api/markets?ids=…`         | Live market data (cached 30s)     |
+| GET    | `/api/global`                | Global market stats (cached 60s)  |
 | GET    | `/api/coins/:id/chart?days=` | Historical prices (cached 60s)    |
 | GET    | `/api/watchlist`             | Current watchlist                 |
 | POST   | `/api/watchlist`             | Add `{ "id": "bitcoin" }`         |
 | DELETE | `/api/watchlist/:id`         | Remove a coin                     |
+
+### Real-time data sources (browser, no key required)
+
+| Source                | Used for                                   |
+|-----------------------|--------------------------------------------|
+| Binance WebSocket     | Sub-second live price ticks (`js/realtime.js`) |
+| CoinGecko REST        | Market snapshots, global stats, sparklines |
+| alternative.me        | Fear & Greed Index (markets page)          |
 
 ---
 

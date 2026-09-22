@@ -136,5 +136,32 @@
     }
   };
 
-  global.CryptoHubAPI = { getMarkets, getSparkline, format, COIN_META, FALLBACK };
+  /**
+   * Fetch global market stats (total market cap, 24h volume, BTC dominance).
+   * Prefers the local backend, then CoinGecko directly, then a fallback.
+   * @returns {Promise<{marketCap:number, volume:number, btcDominance:number, marketCapChange:number, live:boolean}>}
+   */
+  async function getGlobal() {
+    if (location.protocol.startsWith('http')) {
+      try {
+        const data = await fetchJson('/api/global');
+        if (data && data.marketCap) return Object.assign({ live: true }, data);
+      } catch (e) { /* fall through */ }
+    }
+    try {
+      const data = await fetchJson(`${COINGECKO_BASE}/global`);
+      const g = data.data;
+      return {
+        marketCap: g.total_market_cap.usd,
+        volume: g.total_volume.usd,
+        btcDominance: g.market_cap_percentage.btc,
+        marketCapChange: g.market_cap_change_percentage_24h_usd,
+        live: true
+      };
+    } catch (err) {
+      return { marketCap: 2.36e12, volume: 9.85e10, btcDominance: 48.3, marketCapChange: 2.4, live: false };
+    }
+  }
+
+  global.CryptoHubAPI = { getMarkets, getSparkline, getGlobal, format, COIN_META, FALLBACK };
 })(window);

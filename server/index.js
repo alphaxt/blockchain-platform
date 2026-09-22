@@ -64,6 +64,26 @@ app.get('/api/markets', async (req, res) => {
   }
 });
 
+// GET /api/global -> global market stats (cached 60s)
+app.get('/api/global', async (_req, res) => {
+  try {
+    const data = await cached('global', 60000, async () => {
+      const r = await fetch(`${COINGECKO_BASE}/global`);
+      if (!r.ok) throw new Error('Upstream ' + r.status);
+      return r.json();
+    });
+    const g = data.data;
+    res.json({
+      marketCap: g.total_market_cap.usd,
+      volume: g.total_volume.usd,
+      btcDominance: g.market_cap_percentage.btc,
+      marketCapChange: g.market_cap_change_percentage_24h_usd
+    });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
 // GET /api/coins/:id/chart?days=7 -> historical prices (cached 60s)
 app.get('/api/coins/:id/chart', async (req, res) => {
   const id = req.params.id;

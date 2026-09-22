@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="css/shared.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="js/api.js" defer></script>
+    <script src="js/realtime.js" defer></script>
     <script src="js/wallet.js" defer></script>
     <script src="js/app.js" defer></script>
     <style>
@@ -1471,9 +1472,34 @@
 
             // ---- Live market data wiring ---------------------------------
             loadLiveMarkets();
-            // Refresh every 60s so the numbers stay reasonably current.
+            // Refresh the full snapshot (market cap, volume, etc.) every 60s.
             setInterval(loadLiveMarkets, 60000);
+            // Start the real-time WebSocket price stream for the trending coins.
+            startRealtime();
         });
+
+        // Stream sub-second prices into the trending cards via Binance WS.
+        function startRealtime() {
+            if (!window.CryptoHubRealtime) return;
+            const ids = ['bitcoin', 'ethereum', 'cardano', 'solana'];
+            window.CryptoHubRealtime.start(ids);
+            window.CryptoHubRealtime.subscribe((tick) => {
+                const fmt = window.CryptoHubAPI.format;
+                const priceEl = document.querySelector(`[data-price="${tick.id}"]`);
+                const changeEl = document.querySelector(`[data-change="${tick.id}"]`);
+                if (priceEl && window.CryptoHubApp) {
+                    window.CryptoHubApp.flashPrice(priceEl, tick.price, fmt.usd(tick.price));
+                }
+                if (changeEl && tick.changePercent != null) {
+                    changeEl.textContent = fmt.percent(tick.changePercent);
+                    changeEl.className = 'coin-change ' + (tick.changePercent >= 0 ? 'positive' : 'negative');
+                }
+                // Reflect the stream mode in the badge.
+                if (window.CryptoHubApp) {
+                    window.CryptoHubApp.setDataBadge(true, window.CryptoHubRealtime.isFallback() ? '● Live (polling)' : '● Live');
+                }
+            });
+        }
 
         // Fetch live prices and update the trending cards + coin database.
         async function loadLiveMarkets() {
