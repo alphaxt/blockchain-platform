@@ -96,7 +96,8 @@ blockchain-platform/
 │   ├── db.js               # SQLite persistence (watchlist + portfolio holdings)
 │   └── auth.js             # Wallet sign-in: signature recovery + session tokens
 ├── test/
-│   └── api.test.js         # API integration tests (node --test)
+│   ├── api.test.js         # API integration tests (node --test)
+│   └── client.test.js      # Browser module tests (wallet.js, api.js)
 ├── package.json            # Scripts + dependencies
 └── README.md
 ```
@@ -135,9 +136,14 @@ Then visit `http://localhost:3000`. The frontend automatically prefers the local
 
 ### Running tests
 
-The API has integration tests that boot the Express app on an ephemeral port and
-exercise every endpoint. Network-backed routes tolerate upstream failures, so the
-suite passes offline too.
+Two suites run under the built-in Node test runner:
+- **API integration** (`test/api.test.js`) — boots the Express app on an ephemeral
+  port and exercises every endpoint, including the wallet sign-in flow and per-user
+  data isolation. Network-backed routes tolerate upstream failures, so it passes offline too.
+- **Browser modules** (`test/client.test.js`) — loads `js/wallet.js` and `js/api.js`
+  into a fabricated browser global with stubbed `fetch` / `localStorage` / provider,
+  covering wei & WETH calldata encoding, the provider abstraction, and the market-data
+  fallback chain — no browser required.
 
 ```bash
 npm test
