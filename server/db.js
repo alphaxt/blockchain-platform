@@ -16,8 +16,10 @@ db.pragma('journal_mode = WAL');
 // --- Schema ----------------------------------------------------------
 db.exec(`
   CREATE TABLE IF NOT EXISTS watchlist (
-    coin_id TEXT PRIMARY KEY,
-    added_at INTEGER NOT NULL
+    user TEXT NOT NULL DEFAULT 'demo',
+    coin_id TEXT NOT NULL,
+    added_at INTEGER NOT NULL,
+    PRIMARY KEY (user, coin_id)
   );
 
   CREATE TABLE IF NOT EXISTS holdings (
@@ -30,12 +32,30 @@ db.exec(`
   );
 `);
 
-// Seed a sensible default watchlist + demo portfolio once.
-const wlCount = db.prepare('SELECT COUNT(*) AS n FROM watchlist').get().n;
+// Migration: earlier versions had a watchlist keyed only by coin_id (no
+// user column). If we detect that shape, rebuild the table under 'demo'.
+try {
+  const cols = db.prepare("PRAGMA table_info(watchlist)").all();
+  if (!cols.some((c) => c.name === 'user')) {
+    const now = Date.now();
+    const old = db.prepare('SELECT coin_id, added_at FROM watchlist').all();
+    db.exec('ALTER TABLE watchlist RENAME TO watchlist_old;');
+    db.exec(`CREATE TABLE watchlist (
+      user TEXT NOT NULL DEFAULT 'demo', coin_id TEXT NOT NULL,
+      added_at INTEGER NOT NULL, PRIMARY KEY (user, coin_id));`);
+    const ins = db.prepare('INSERT OR IGNORE INTO watchlist (user, coin_id, added_at) VALUES (?, ?, ?)');
+    old.forEach((r) => ins.run('demo', r.coin_id, r.added_at || now));
+    db.exec('DROP TABLE watchlist_old;');
+  }
+} catch (e) { /* fresh DB already has the new shape */ }
+
+// Seed a sensible default watchlist + demo portfolio once (for the shared
+// 'demo' scope used when a request is unauthenticated).
+const wlCount = db.prepare("SELECT COUNT(*) AS n FROM watchlist WHERE user = 'demo'").get().n;
 if (wlCount === 0) {
   const now = Date.now();
-  const ins = db.prepare('INSERT INTO watchlist (coin_id, added_at) VALUES (?, ?)');
-  ['bitcoin', 'ethereum', 'solana'].forEach((id) => ins.run(id, now));
+  const ins = db.prepare('INSERT OR IGNORE INTO watchlist (user, coin_id, added_at) VALUES (?, ?, ?)');
+  ['bitcoin', 'ethereum', 'solana'].forEach((id) => ins.run('demo', id, now));
 }
 const hCount = db.prepare('SELECT COUNT(*) AS n FROM holdings').get().n;
 if (hCount === 0) {
@@ -47,16 +67,16 @@ if (hCount === 0) {
 
 // --- Watchlist -------------------------------------------------------
 const Watchlist = {
-  list() {
-    return db.prepare('SELECT coin_id FROM watchlist ORDER BY added_at').all().map((r) => r.coin_id);
+  list(user = 'demo') {
+    return db.prepare('SELECT coin_id FROM watchlist WHERE user = ? ORDER BY added_at').all(user).map((r) => r.coin_id);
   },
-  add(coinId) {
-    db.prepare('INSERT OR IGNORE INTO watchlist (coin_id, added_at) VALUES (?, ?)').run(coinId, Date.now());
-    return this.list();
+  add(user, coinId) {
+    db.prepare('INSERT OR IGNORE INTO watchlist (user, coin_id, added_at) VALUES (?, ?, ?)').run(user, coinId, Date.now());
+    return this.list(user);
   },
-  remove(coinId) {
-    db.prepare('DELETE FROM watchlist WHERE coin_id = ?').run(coinId);
-    return this.list();
+  remove(user, coinId) {
+    db.prepare('DELETE FROM watchlist WHERE user = ? AND coin_id = ?').run(user, coinId);
+    return this.list(user);
   }
 };
 

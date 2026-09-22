@@ -33,14 +33,15 @@ test.before(async () => {
 
 test.after(() => { if (server) server.close(); });
 
-function req(method, path, body) {
+function req(method, path, body, extraHeaders) {
   return new Promise((resolve, reject) => {
     const data = body ? JSON.stringify(body) : null;
     const url = new URL(base + path);
-    const r = http.request(url, {
-      method,
-      headers: data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {}
-    }, (res) => {
+    const headers = Object.assign(
+      data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {},
+      extraHeaders || {}
+    );
+    const r = http.request(url, { method, headers }, (res) => {
       let raw = '';
       res.on('data', (c) => { raw += c; });
       res.on('end', () => {
@@ -123,4 +124,103 @@ test('static frontend is served', async () => {
   const { status, raw } = await req('GET', '/');
   assert.strictEqual(status, 200);
   assert.ok(/CryptoHub/i.test(raw), 'homepage should mention CryptoHub');
+});
+
+// --- Wallet auth (Sign-In With Ethereum) ----------------------------
+const { secp256k1 } = require('@noble/curves/secp256k1');
+const { keccak_256 } = require('@noble/hashes/sha3');
+
+function addressFromPub(pub) {
+  return '0x' + Buffer.from(keccak_256(pub.slice(1)).slice(-20)).toString('hex');
+}
+function personalHash(message) {
+  const msg = Buffer.from(message, 'utf8');
+  const prefix = Buffer.from('\x19Ethereum Signed Message:\n' + msg.length, 'utf8');
+  return keccak_256(Buffer.concat([prefix, msg]));
+}
+function signPersonal(message, priv) {
+  const sig = secp256k1.sign(personalHash(message), priv);
+  const compact = sig.toCompactRawBytes ? sig.toCompactRawBytes() : sig.toBytes('compact');
+  return '0x' + Buffer.from(compact).toString('hex') + (27 + sig.recovery).toString(16).padStart(2, '0');
+}
+function makeWallet() {
+  const priv = secp256k1.utils.randomPrivateKey();
+  const address = addressFromPub(secp256k1.getPublicKey(priv, false));
+  return { priv, address };
+}
+async function signIn(w) {
+  const nonceRes = await req('GET', '/api/auth/nonce?address=' + w.address);
+  assert.strictEqual(nonceRes.status, 200);
+  const signature = signPersonal(nonceRes.json.message, w.priv);
+  const verifyRes = await req('POST', '/api/auth/verify', { address: w.address, signature });
+  assert.strictEqual(verifyRes.status, 200, 'verify should succeed');
+  assert.ok(verifyRes.json.token, 'should return a token');
+  return verifyRes.json.token;
+}
+
+test('auth: nonce -> sign -> verify issues a token, /me reflects it', async () => {
+  const w = makeWallet();
+  const token = await signIn(w);
+  const me = await req('GET', '/api/auth/me', null, { Authorization: 'Bearer ' + token });
+  assert.strictEqual(me.status, 200);
+  assert.strictEqual(me.json.authenticated, true);
+  assert.strictEqual(me.json.address, w.address.toLowerCase());
+});
+
+test('auth: verify rejects a signature from the wrong key', async () => {
+  const w = makeWallet();
+  const other = makeWallet();
+  const nonceRes = await req('GET', '/api/auth/nonce?address=' + w.address);
+  const badSig = signPersonal(nonceRes.json.message, other.priv); // signed by the wrong key
+  const verifyRes = await req('POST', '/api/auth/verify', { address: w.address, signature: badSig });
+  assert.strictEqual(verifyRes.status, 401);
+});
+
+test('auth: verify requires a prior nonce', async () => {
+  const w = makeWallet();
+  const verifyRes = await req('POST', '/api/auth/verify', { address: w.address, signature: '0x' + '11'.repeat(65) });
+  assert.strictEqual(verifyRes.status, 401);
+});
+
+test('auth: invalid/garbage token is treated as anonymous', async () => {
+  const me = await req('GET', '/api/auth/me', null, { Authorization: 'Bearer not.a.token' });
+  assert.strictEqual(me.status, 200);
+  assert.strictEqual(me.json.authenticated, false);
+});
+
+test('auth: portfolios are isolated per authenticated wallet', async () => {
+  const a = makeWallet();
+  const b = makeWallet();
+  const tokenA = await signIn(a);
+  const tokenB = await signIn(b);
+  const authA = { Authorization: 'Bearer ' + tokenA };
+  const authB = { Authorization: 'Bearer ' + tokenB };
+
+  // A adds a holding that B should never see.
+  const up = await req('POST', '/api/portfolio', { coinId: 'chainlink', amount: 7 }, authA);
+  assert.strictEqual(up.status, 200);
+  assert.ok(up.json.holdings.some((h) => h.coin_id === 'chainlink'));
+
+  const gotB = await req('GET', '/api/portfolio', null, authB);
+  assert.ok(gotB.status === 200 || gotB.status === 502);
+  assert.ok(!gotB.json.holdings.some((h) => (h.coinId || h.coin_id) === 'chainlink'),
+    'wallet B must not see wallet A holdings');
+
+  // cleanup
+  await req('DELETE', '/api/portfolio/chainlink', null, authA);
+});
+
+test('auth: watchlist is isolated per authenticated wallet', async () => {
+  const a = makeWallet();
+  const tokenA = await signIn(a);
+  const authA = { Authorization: 'Bearer ' + tokenA };
+
+  const added = await req('POST', '/api/watchlist', { id: 'uniswap' }, authA);
+  assert.ok(added.json.watchlist.includes('uniswap'));
+
+  // Anonymous (demo) scope should not contain wallet A's coin.
+  const anon = await req('GET', '/api/watchlist');
+  assert.ok(!anon.json.watchlist.includes('uniswap'), 'demo watchlist must not see wallet A entry');
+
+  await req('DELETE', '/api/watchlist/uniswap', null, authA);
 });

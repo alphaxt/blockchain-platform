@@ -28,20 +28,24 @@ try {
     { coin_id: 'bitcoin', amount: 0.3542 }, { coin_id: 'ethereum', amount: 4.82 },
     { coin_id: 'solana', amount: 45 }, { coin_id: 'cardano', amount: 5200 }
   ] };
+  // Per-user maps so the fallback matches the SQLite behavior.
+  const memWatch = { demo: mem.watchlist.slice() };
+  const memHold = { demo: mem.holdings.slice() };
   store = {
     Watchlist: {
-      list: () => mem.watchlist.slice(),
-      add: (id) => { if (!mem.watchlist.includes(id)) mem.watchlist.push(id); return mem.watchlist.slice(); },
-      remove: (id) => { mem.watchlist = mem.watchlist.filter((c) => c !== id); return mem.watchlist.slice(); }
+      list: (user = 'demo') => (memWatch[user] || (memWatch[user] = [])).slice(),
+      add: (user, id) => { const w = memWatch[user] || (memWatch[user] = []); if (!w.includes(id)) w.push(id); return w.slice(); },
+      remove: (user, id) => { memWatch[user] = (memWatch[user] || []).filter((c) => c !== id); return memWatch[user].slice(); }
     },
     Holdings: {
-      list: () => mem.holdings.slice(),
-      upsert: (_u, id, amt) => { const h = mem.holdings.find((x) => x.coin_id === id); if (h) h.amount = amt; else mem.holdings.push({ coin_id: id, amount: amt }); return mem.holdings.slice(); },
-      remove: (_u, id) => { mem.holdings = mem.holdings.filter((x) => x.coin_id !== id); return mem.holdings.slice(); }
+      list: (user = 'demo') => (memHold[user] || (memHold[user] = [])).slice(),
+      upsert: (user, id, amt) => { const arr = memHold[user] || (memHold[user] = []); const h = arr.find((x) => x.coin_id === id); if (h) h.amount = amt; else arr.push({ coin_id: id, amount: amt }); return arr.slice(); },
+      remove: (user, id) => { memHold[user] = (memHold[user] || []).filter((x) => x.coin_id !== id); return memHold[user].slice(); }
     }
   };
 }
 const { Watchlist, Holdings } = store;
+const auth = require('./auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -49,6 +53,15 @@ const COINGECKO_BASE = 'https://api.coingecko.com/api/v3';
 const ROOT = path.resolve(__dirname, '..');
 
 app.use(express.json());
+// Populate req.user (the authenticated address) when a valid Bearer token
+// is present; routes fall back to the shared 'demo' scope otherwise.
+app.use('/api', auth.authMiddleware(false));
+
+// Resolve which user a request operates on: the authenticated address when
+// signed in, else the explicit ?user/body.user (legacy), else 'demo'.
+function scopeOf(req) {
+  return req.user || (req.query && req.query.user) || (req.body && req.body.user) || 'demo';
+}
 
 // --- Simple in-memory cache to respect upstream rate limits ----------
 const cache = new Map();
@@ -71,6 +84,33 @@ const DEFAULT_IDS = [
 // GET /api/health -> service liveness
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'cryptohub-api', time: new Date().toISOString() });
+});
+
+// --- Wallet auth (Sign-In With Ethereum style) ----------------------
+// GET /api/auth/nonce?address=0x.. -> a nonce + the exact message to sign
+app.get('/api/auth/nonce', (req, res) => {
+  try {
+    const { nonce, message } = auth.issueNonce(String(req.query.address || ''));
+    res.json({ nonce, message });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/verify {address, signature} -> session token on success
+app.post('/api/auth/verify', (req, res) => {
+  try {
+    const { address, signature } = req.body || {};
+    const result = auth.verifySignature(String(address || ''), String(signature || ''));
+    res.json(result); // { address, token, expires }
+  } catch (err) {
+    res.status(401).json({ error: err.message });
+  }
+});
+
+// GET /api/auth/me -> who the current Bearer token authenticates as (if any)
+app.get('/api/auth/me', (req, res) => {
+  res.json({ authenticated: !!req.user, address: req.user || null });
 });
 
 // GET /api/markets?ids=bitcoin,ethereum -> live market data (cached 30s)
@@ -129,23 +169,23 @@ app.get('/api/coins/:id/chart', async (req, res) => {
   }
 });
 
-// --- Watchlist (persisted) -------------------------------------------
-app.get('/api/watchlist', (_req, res) => res.json({ watchlist: Watchlist.list() }));
+// --- Watchlist (persisted, per-user) ---------------------------------
+app.get('/api/watchlist', (req, res) => res.json({ watchlist: Watchlist.list(scopeOf(req)) }));
 
 app.post('/api/watchlist', (req, res) => {
   const id = (req.body && req.body.id || '').toString().trim().toLowerCase();
   if (!id) return res.status(400).json({ error: 'Missing coin id' });
-  res.json({ watchlist: Watchlist.add(id) });
+  res.json({ watchlist: Watchlist.add(scopeOf(req), id) });
 });
 
 app.delete('/api/watchlist/:id', (req, res) => {
-  res.json({ watchlist: Watchlist.remove(req.params.id.toLowerCase()) });
+  res.json({ watchlist: Watchlist.remove(scopeOf(req), req.params.id.toLowerCase()) });
 });
 
 // --- Portfolio (persisted) -------------------------------------------
 // Returns holdings enriched with live prices + computed USD value.
 app.get('/api/portfolio', async (req, res) => {
-  const user = (req.query.user || 'demo').toString();
+  const user = scopeOf(req);
   const holdings = Holdings.list(user);
   if (!holdings.length) return res.json({ user, holdings: [], totalValue: 0, live: false });
 
@@ -178,7 +218,7 @@ app.get('/api/portfolio', async (req, res) => {
 });
 
 app.post('/api/portfolio', (req, res) => {
-  const user = (req.body && req.body.user || 'demo').toString();
+  const user = scopeOf(req);
   const coinId = (req.body && req.body.coinId || '').toString().trim().toLowerCase();
   const amount = Number(req.body && req.body.amount);
   if (!coinId || isNaN(amount)) return res.status(400).json({ error: 'coinId and numeric amount required' });
@@ -186,7 +226,7 @@ app.post('/api/portfolio', (req, res) => {
 });
 
 app.delete('/api/portfolio/:coinId', (req, res) => {
-  const user = (req.query.user || 'demo').toString();
+  const user = scopeOf(req);
   res.json({ holdings: Holdings.remove(user, req.params.coinId.toLowerCase()) });
 });
 

@@ -471,6 +471,9 @@
         <div class="wallet-header">
             <h1 class="wallet-title">My Wallet</h1>
             <div class="wallet-actions">
+                <button class="btn btn-outline" data-signin style="display:none;">
+                    <i class="fas fa-right-to-bracket"></i> Sign in
+                </button>
                 <button class="btn btn-primary">
                     <i class="fas fa-plus"></i> Add Funds
                 </button>
@@ -727,6 +730,7 @@
                     });
                 }
                 renderOnChainActivity(s);
+                reflectSignIn();
             } else {
                 set('[data-eth-balance]', 'Not connected');
                 set('[data-eth-usd]', 'Connect your wallet to view');
@@ -737,6 +741,23 @@
                 show('[data-explorer-link]', false);
                 show('[data-network-switch]', false);
                 resetOnChainActivity();
+                reflectSignIn();
+            }
+        }
+
+        // Reflect backend sign-in state on the Sign in / Sign out button.
+        function reflectSignIn() {
+            const W = window.CryptoHubWallet;
+            const btn = document.querySelector('[data-signin]');
+            if (!btn || !W) return;
+            const connected = W.getState().connected;
+            const online = location.protocol.startsWith('http');
+            if (!connected || !online) { btn.style.display = 'none'; return; }
+            btn.style.display = '';
+            if (W.isLoggedIn()) {
+                btn.innerHTML = '<i class="fas fa-right-from-bracket"></i> Sign out';
+            } else {
+                btn.innerHTML = '<i class="fas fa-right-to-bracket"></i> Sign in';
             }
         }
 
@@ -915,6 +936,28 @@
                     window.open(W.explorerTxUrl(hash), '_blank', 'noopener');
                 } catch (e) {
                     if (App) App.toast('Swap failed: ' + (e.code === 4001 ? 'rejected' : e.message), 'error');
+                }
+            });
+
+            // Backend sign-in (Sign-In With Ethereum): prove wallet ownership
+            // to scope the portfolio/watchlist to this address.
+            const signinBtn = document.querySelector('[data-signin]');
+            if (signinBtn) signinBtn.addEventListener('click', async () => {
+                if (!W.getState().connected) { if (App) App.toast('Connect your wallet first', 'warning'); return; }
+                if (W.isLoggedIn()) {
+                    W.logout();
+                    if (App) App.toast('Signed out', 'info');
+                    reflectSignIn();
+                    loadWalletPortfolio(); // back to the shared demo view
+                    return;
+                }
+                try {
+                    const res = await W.login();
+                    if (App) App.toast('Signed in as ' + W.shorten(res.address), 'success');
+                    reflectSignIn();
+                    loadWalletPortfolio(); // now shows this wallet's own holdings
+                } catch (e) {
+                    if (App) App.toast('Sign-in failed: ' + (e.code === 4001 ? 'rejected' : e.message), 'error');
                 }
             });
         }

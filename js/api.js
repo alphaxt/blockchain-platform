@@ -59,11 +59,24 @@
     }));
   }
 
-  async function fetchJson(url, ms = 8000) {
+  // Attach the wallet session token (if signed in) so per-user endpoints
+  // like /api/portfolio return the authenticated wallet's data.
+  function authHeaders(extra) {
+    const headers = Object.assign({}, extra);
+    try {
+      const token = window.CryptoHubWallet && window.CryptoHubWallet.getToken && window.CryptoHubWallet.getToken();
+      if (token) headers.Authorization = 'Bearer ' + token;
+    } catch (e) { /* wallet module not loaded */ }
+    return headers;
+  }
+
+  async function fetchJson(url, ms = 8000, options) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), ms);
     try {
-      const res = await fetch(url, { signal: controller.signal });
+      const opts = Object.assign({ signal: controller.signal }, options);
+      opts.headers = authHeaders(opts.headers);
+      const res = await fetch(url, opts);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } finally {

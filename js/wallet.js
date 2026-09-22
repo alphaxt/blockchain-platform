@@ -91,6 +91,7 @@
   function disconnect() {
     state = { connected: false, account: null, chainId: null, chainName: null, balance: null };
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem('cryptohub_session_token'); // end backend session too
     emit();
   }
 
@@ -170,6 +171,50 @@
     const hex = '0x' + Array.from(new TextEncoder().encode(message))
       .map((b) => b.toString(16).padStart(2, '0')).join('');
     return global.ethereum.request({ method: 'personal_sign', params: [hex, state.account] });
+  }
+
+  // --- Backend session (Sign-In With Ethereum) -----------------------
+  const TOKEN_KEY = 'cryptohub_session_token';
+
+  /** The stored bearer token for the current session, if any. */
+  function getToken() {
+    return localStorage.getItem(TOKEN_KEY) || null;
+  }
+
+  function isLoggedIn() {
+    return !!getToken();
+  }
+
+  /**
+   * Prove control of the connected address to the backend: fetch a nonce,
+   * personal_sign it, and exchange the signature for a session token that
+   * scopes the watchlist/portfolio APIs to this wallet.
+   * Only works when served over http(s) (needs the backend).
+   * @returns {Promise<{address:string, token:string, expires:number}>}
+   */
+  async function login() {
+    if (!location.protocol.startsWith('http')) throw new Error('Sign-in requires the backend server.');
+    if (!state.account) throw new Error('Connect a wallet first.');
+    const nonceRes = await fetch('/api/auth/nonce?address=' + encodeURIComponent(state.account));
+    if (!nonceRes.ok) throw new Error('Could not start sign-in.');
+    const { message } = await nonceRes.json();
+    const signature = await signMessage(message);
+    const verifyRes = await fetch('/api/auth/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: state.account, signature })
+    });
+    const data = await verifyRes.json();
+    if (!verifyRes.ok) throw new Error(data.error || 'Sign-in failed.');
+    localStorage.setItem(TOKEN_KEY, data.token);
+    emit();
+    return data;
+  }
+
+  /** Clear the backend session (does not disconnect the wallet). */
+  function logout() {
+    localStorage.removeItem(TOKEN_KEY);
+    emit();
   }
 
   // Block explorer base per chain, for building tx / address links.
@@ -323,6 +368,7 @@
     global.ethereum.on('accountsChanged', async (accounts) => {
       if (!accounts.length) return disconnect();
       state.account = accounts[0];
+      localStorage.removeItem('cryptohub_session_token'); // token is bound to the old address
       await refreshBalance();
       emit();
     });
@@ -340,6 +386,10 @@
     switchChain,
     sendEth,
     signMessage,
+    login,
+    logout,
+    isLoggedIn,
+    getToken,
     getTxCount,
     wrapEth,
     unwrapEth,
