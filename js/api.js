@@ -163,5 +163,50 @@
     }
   }
 
-  global.CryptoHubAPI = { getMarkets, getSparkline, getGlobal, format, COIN_META, FALLBACK };
+  /**
+   * Fetch the top N coins by market cap (with 7-day sparkline data).
+   * Used by the full Prices table. Returns [] on failure.
+   * @param {number} [perPage] how many coins (max 250)
+   * @param {number} [page] page number
+   */
+  async function getTopCoins(perPage = 50, page = 1) {
+    const url = `${COINGECKO_BASE}/coins/markets?vs_currency=usd&order=market_cap_desc` +
+      `&per_page=${perPage}&page=${page}&sparkline=true&price_change_percentage=24h`;
+    try {
+      const data = await fetchJson(url, 12000);
+      return data.map((c) => ({
+        id: c.id,
+        rank: c.market_cap_rank,
+        name: c.name,
+        symbol: (c.symbol || '').toUpperCase(),
+        image: c.image,
+        price: c.current_price,
+        change24h: c.price_change_percentage_24h,
+        marketCap: c.market_cap,
+        volume: c.total_volume,
+        sparkline: (c.sparkline_in_7d && c.sparkline_in_7d.price) || []
+      }));
+    } catch (err) {
+      console.warn('[CryptoHub] getTopCoins failed:', err.message);
+      return [];
+    }
+  }
+
+  /**
+   * Fetch the persisted demo portfolio (holdings enriched with live prices).
+   * Only meaningful when served by the backend; returns null otherwise.
+   */
+  async function getPortfolio(user = 'demo') {
+    if (!location.protocol.startsWith('http')) return null;
+    try {
+      return await fetchJson(`/api/portfolio?user=${encodeURIComponent(user)}`);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  global.CryptoHubAPI = {
+    getMarkets, getSparkline, getGlobal, getTopCoins, getPortfolio,
+    format, COIN_META, FALLBACK
+  };
 })(window);

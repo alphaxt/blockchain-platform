@@ -15,5 +15,10 @@ node_modules/
 npm-debug.log*
 package-lock.json
 
+# SQLite database files
+server/*.db
+server/*.db-shm
+server/*.db-wal
+
 # Logs
 *.log

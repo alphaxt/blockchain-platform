@@ -36,12 +36,21 @@ You can run it two ways:
 - Shows the connected account, network name, and native ETH balance
 - Reacts to account/chain changes and restores the session on reload
 - Chain switching helper and toast notifications
+- **Send native ETH** through the connected wallet (`eth_sendTransaction`), with precise wei conversion and a post-send balance refresh
+- **Sign messages** with `personal_sign`
+- **Block-explorer links** for the connected address and sent transactions, resolved per chain (Etherscan, Polygonscan, Arbiscan, and more)
 
 **Backend API (optional)**
 - `GET /api/health` — service liveness
 - `GET /api/markets?ids=bitcoin,ethereum` — cached live market data
+- `GET /api/global` — cached global market stats
 - `GET /api/coins/:id/chart?days=7` — historical prices
-- `GET|POST|DELETE /api/watchlist` — in-memory demo watchlist
+- `GET|POST|DELETE /api/watchlist` — watchlist persisted in SQLite
+- `GET|POST|DELETE /api/portfolio` — demo portfolio holdings persisted in SQLite, enriched with live prices and a computed USD total
+
+**Persistence**
+- Watchlist and portfolio holdings are stored in **SQLite** (`better-sqlite3`) at `server/cryptohub.db`, so they survive server restarts
+- Falls back automatically to an in-memory store if the native SQLite module can't load, so the API works in any environment
 
 ---
 
@@ -55,6 +64,8 @@ You can run it two ways:
 | Web3       | EIP-1193 provider (MetaMask) |
 | Market data| CoinGecko public API |
 | Backend    | Node.js 18+, Express |
+| Persistence| SQLite via better-sqlite3 (in-memory fallback) |
+| Tests      | Built-in Node test runner (`node --test`) |
 
 ---
 
@@ -72,7 +83,10 @@ blockchain-platform/
 │   ├── wallet.js           # Web3 / MetaMask wallet module
 │   └── app.js              # Shared bootstrap (connect button, toasts, badges, price flash)
 ├── server/
-│   └── index.js            # Express API + static host
+│   ├── index.js            # Express API + static host
+│   └── db.js               # SQLite persistence (watchlist + portfolio holdings)
+├── test/
+│   └── api.test.js         # API integration tests (node --test)
 ├── package.json            # Scripts + dependencies
 └── README.md
 ```
@@ -109,6 +123,16 @@ npm run dev
 Then visit `http://localhost:3000`. The frontend automatically prefers the local
 `/api/markets` endpoint when served over http(s).
 
+### Running tests
+
+The API has integration tests that boot the Express app on an ephemeral port and
+exercise every endpoint. Network-backed routes tolerate upstream failures, so the
+suite passes offline too.
+
+```bash
+npm test
+```
+
 ---
 
 ## 🔌 API Reference
@@ -119,9 +143,12 @@ Then visit `http://localhost:3000`. The frontend automatically prefers the local
 | GET    | `/api/markets?ids=…`         | Live market data (cached 30s)     |
 | GET    | `/api/global`                | Global market stats (cached 60s)  |
 | GET    | `/api/coins/:id/chart?days=` | Historical prices (cached 60s)    |
-| GET    | `/api/watchlist`             | Current watchlist                 |
+| GET    | `/api/watchlist`             | Current watchlist (SQLite)        |
 | POST   | `/api/watchlist`             | Add `{ "id": "bitcoin" }`         |
 | DELETE | `/api/watchlist/:id`         | Remove a coin                     |
+| GET    | `/api/portfolio?user=demo`   | Holdings + live prices + total    |
+| POST   | `/api/portfolio`             | Upsert `{ "coinId": "…", "amount": 1.5 }` |
+| DELETE | `/api/portfolio/:coinId`     | Remove a holding                  |
 
 ### Real-time data sources (browser, no key required)
 
@@ -154,10 +181,9 @@ No wallet installed? The app prompts you and links to the MetaMask download page
 
 ## 🎯 Future Enhancements
 
-- Persist the watchlist/portfolio to a real database
 - WalletConnect support for mobile wallets
-- On-chain transaction sending (send/swap) via the connected provider
-- Server-side auth and per-user portfolios
+- On-chain swaps via the connected provider (native ETH sending is already supported)
+- Server-side auth so portfolios are truly per-user (holdings are currently keyed by a `user` field, defaulting to `demo`)
 - Extract remaining inline CSS/JS from individual pages into `css/` and `js/`
 
 ---

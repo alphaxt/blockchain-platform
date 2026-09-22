@@ -6,7 +6,8 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "node --watch server/index.js"
+    "dev": "node --watch server/index.js",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=18"
@@ -23,6 +24,7 @@
   "author": "Muhammad Danish",
   "license": "MIT",
   "dependencies": {
+    "better-sqlite3": "^11.10.0",
     "express": "^4.22.3"
   }
 }

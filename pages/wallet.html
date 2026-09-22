@@ -6,7 +6,12 @@
     <title>CryptoHub | Wallet</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/shared.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="../js/api.js" defer></script>
+    <script src="../js/realtime.js" defer></script>
+    <script src="../js/wallet.js" defer></script>
+    <script src="../js/app.js" defer></script>
     <style>
         :root {
             --primary: #6c5ce7;
@@ -682,9 +687,7 @@
         </div>
         
        <div class="user-actions">
-    <a href="connectwallet.html" style="text-decoration: none;">
-        <button class="btn btn-outline">Connect Wallet</button>
-    </a>
+    <button class="btn btn-outline" data-connect-wallet data-label="Connect Wallet">Connect Wallet</button>
     <div class="user-profile">
         <a href="profile.html" style="text-decoration: none; color: inherit;">
             <div class="avatar">JD</div>
@@ -712,46 +715,48 @@
         <div class="wallet-summary">
             <div class="wallet-card">
                 <div class="card-header">
-                    <div class="card-title">Total Balance</div>
+                    <div class="card-title">On-Chain ETH Balance</div>
+                    <div class="card-icon">
+                        <i class="fab fa-ethereum"></i>
+                    </div>
+                </div>
+                <div class="balance-amount" data-eth-balance>Not connected</div>
+                <div class="balance-change">
+                    <span data-eth-usd>Connect your wallet to view</span>
+                </div>
+            </div>
+            
+            <div class="wallet-card">
+                <div class="card-header">
+                    <div class="card-title">Wallet Address</div>
                     <div class="card-icon">
                         <i class="fas fa-wallet"></i>
                     </div>
                 </div>
-                <div class="balance-amount">$24,568.90</div>
+                <div class="balance-amount" data-wallet-address style="font-size:1.6rem;">—</div>
                 <div class="balance-change">
-                    <span class="change-positive">
-                        <i class="fas fa-arrow-up"></i> 2.4%
-                    </span>
-                    <span>last 24h</span>
+                    <a href="#" data-explorer-link target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;display:none;">View on Explorer <i class="fas fa-external-link-alt"></i></a>
+                    <span data-wallet-address-hint>Not connected</span>
                 </div>
             </div>
             
             <div class="wallet-card">
                 <div class="card-header">
-                    <div class="card-title">Estimated Earnings</div>
+                    <div class="card-title">Network</div>
                     <div class="card-icon">
-                        <i class="fas fa-chart-line"></i>
+                        <i class="fas fa-network-wired"></i>
                     </div>
                 </div>
-                <div class="balance-amount">$1,245.30</div>
+                <div class="balance-amount" data-network-name style="font-size:1.6rem;">—</div>
                 <div class="balance-change">
-                    <span class="change-positive">
-                        <i class="fas fa-arrow-up"></i> 5.2%
-                    </span>
-                    <span>last 30d</span>
-                </div>
-            </div>
-            
-            <div class="wallet-card">
-                <div class="card-header">
-                    <div class="card-title">Portfolio Allocation</div>
-                    <div class="card-icon">
-                        <i class="fas fa-pie-chart"></i>
-                    </div>
-                </div>
-                <div class="balance-amount">8 Assets</div>
-                <div class="balance-change">
-                    <span>Diversified</span>
+                    <select data-network-switch style="background:rgba(255,255,255,0.08);color:var(--light);border:1px solid rgba(108,92,231,0.3);border-radius:8px;padding:0.4rem;display:none;">
+                        <option value="0x1">Ethereum Mainnet</option>
+                        <option value="0xaa36a7">Sepolia Testnet</option>
+                        <option value="0x89">Polygon</option>
+                        <option value="0xa4b1">Arbitrum One</option>
+                        <option value="0xa">Optimism</option>
+                    </select>
+                    <span data-network-hint>Not connected</span>
                 </div>
             </div>
         </div>
@@ -790,12 +795,12 @@
                             <p class="action-desc">Exchange assets instantly</p>
                         </div>
                         
-                        <div class="action-card">
+                        <div class="action-card" data-action="send" style="cursor:pointer;">
                             <div class="action-icon">
                                 <i class="fas fa-paper-plane"></i>
                             </div>
                             <h3 class="action-title">Send</h3>
-                            <p class="action-desc">Transfer to another wallet</p>
+                            <p class="action-desc">Transfer ETH to another wallet</p>
                         </div>
                     </div>
                 </section>
@@ -1142,8 +1147,75 @@
     </footer>
 
     <script>
+        // ---- Real Web3 wallet wiring --------------------------------
+        function reflectWallet(s) {
+            const set = (sel, txt) => { const el = document.querySelector(sel); if (el) el.textContent = txt; };
+            const show = (sel, on) => { const el = document.querySelector(sel); if (el) el.style.display = on ? '' : 'none'; };
+            const W = window.CryptoHubWallet;
+            if (s.connected) {
+                set('[data-eth-balance]', (s.balance != null ? s.balance.toFixed(5) : '—') + ' ETH');
+                set('[data-wallet-address]', W.shorten(s.account));
+                set('[data-wallet-address-hint]', '');
+                set('[data-network-name]', s.chainName || '—');
+                set('[data-network-hint]', '');
+                const link = document.querySelector('[data-explorer-link]');
+                if (link) { link.href = W.explorerAddressUrl(s.account); link.style.display = ''; }
+                const sw = document.querySelector('[data-network-switch]');
+                if (sw) { sw.style.display = ''; if (s.chainId) sw.value = s.chainId; }
+                // Rough USD value of ETH balance using live ETH price.
+                if (s.balance != null && window.CryptoHubAPI) {
+                    window.CryptoHubAPI.getMarkets(['ethereum']).then(({ coins }) => {
+                        const eth = coins.find((c) => c.id === 'ethereum');
+                        if (eth) set('[data-eth-usd]', '≈ ' + window.CryptoHubAPI.format.usd(s.balance * eth.price));
+                    });
+                }
+            } else {
+                set('[data-eth-balance]', 'Not connected');
+                set('[data-eth-usd]', 'Connect your wallet to view');
+                set('[data-wallet-address]', '—');
+                set('[data-wallet-address-hint]', 'Not connected');
+                set('[data-network-name]', '—');
+                set('[data-network-hint]', 'Not connected');
+                show('[data-explorer-link]', false);
+                show('[data-network-switch]', false);
+            }
+        }
+
+        function initWalletPage() {
+            const W = window.CryptoHubWallet;
+            const App = window.CryptoHubApp;
+            if (!W) return;
+            W.onChange(reflectWallet);
+            reflectWallet(W.getState());
+
+            // Network switcher
+            const sw = document.querySelector('[data-network-switch]');
+            if (sw) sw.addEventListener('change', async function() {
+                try { await W.switchChain(this.value); }
+                catch (e) { if (App) App.toast('Could not switch network: ' + e.message, 'error'); }
+            });
+
+            // Send ETH flow (uses prompts for a dependency-free UX)
+            const sendCard = document.querySelector('[data-action="send"]');
+            if (sendCard) sendCard.addEventListener('click', async () => {
+                if (!W.getState().connected) { if (App) App.toast('Connect your wallet first', 'warning'); return; }
+                const to = prompt('Recipient address (0x...):');
+                if (!to) return;
+                const amount = prompt('Amount in ETH:');
+                if (!amount) return;
+                try {
+                    const hash = await W.sendEth(to.trim(), amount.trim());
+                    if (App) App.toast('Transaction sent: ' + hash.slice(0, 10) + '…', 'success');
+                    window.open(W.explorerTxUrl(hash), '_blank', 'noopener');
+                } catch (e) {
+                    if (App) App.toast('Send failed: ' + (e.code === 4001 ? 'rejected' : e.message), 'error');
+                }
+            });
+        }
+
         // Initialize allocation chart
         document.addEventListener('DOMContentLoaded', function() {
+            initWalletPage();
             // Allocation chart
             const allocationCtx = document.getElementById('allocationChart').getContext('2d');
             new Chart(allocationCtx, {

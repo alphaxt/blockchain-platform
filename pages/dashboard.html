@@ -6,7 +6,12 @@
     <title>CryptoHub | Dashboard</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/shared.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="../js/api.js" defer></script>
+    <script src="../js/realtime.js" defer></script>
+    <script src="../js/wallet.js" defer></script>
+    <script src="../js/app.js" defer></script>
     <style>
         :root {
             --primary: #6c5ce7;
@@ -647,9 +652,7 @@
         </div>
         
        <div class="user-actions">
-    <a href="connectwallet.html" style="text-decoration: none;">
-        <button class="btn btn-outline">Connect Wallet</button>
-    </a>
+    <button class="btn btn-outline" data-connect-wallet data-label="Connect Wallet">Connect Wallet</button>
     <div class="user-profile">
         <a href="profile.html" style="text-decoration: none; color: inherit;">
             <div class="avatar">JD</div>
@@ -679,26 +682,26 @@
                 <!-- Portfolio Summary -->
                 <div class="portfolio-summary">
                     <div class="summary-card">
-                        <div class="summary-label">Total Portfolio Value</div>
-                        <div class="summary-value">$42,568.90</div>
-                        <div class="summary-change positive">
-                            <i class="fas fa-arrow-up"></i> $1,245.60 (3.1%)
+                        <div class="summary-label">Total Portfolio Value <span class="live-badge" data-live-badge style="font-size:0.7rem;">● …</span></div>
+                        <div class="summary-value" data-portfolio-total>$42,568.90</div>
+                        <div class="summary-change positive" data-portfolio-change>
+                            <i class="fas fa-arrow-up"></i> Loading…
                         </div>
                     </div>
                     
                     <div class="summary-card">
                         <div class="summary-label">24h Change</div>
-                        <div class="summary-value positive">+$1,245.60</div>
-                        <div class="summary-change positive">
-                            <i class="fas fa-chart-line"></i> 3.1% increase
+                        <div class="summary-value positive" data-portfolio-24h>+$0.00</div>
+                        <div class="summary-change" data-portfolio-24h-pct>
+                            <i class="fas fa-chart-line"></i> —
                         </div>
                     </div>
                     
                     <div class="summary-card">
                         <div class="summary-label">Assets</div>
-                        <div class="summary-value">12</div>
+                        <div class="summary-value" data-portfolio-count>0</div>
                         <div class="summary-change">
-                            <i class="fas fa-coins"></i> 5 tokens, 7 coins
+                            <i class="fas fa-coins"></i> holdings tracked
                         </div>
                     </div>
                 </div>
@@ -1066,93 +1069,103 @@
     </footer>
 
     <script>
-        // Initialize charts and date
-        document.addEventListener('DOMContentLoaded', function() {
-            // Set current date
-            const now = new Date();
-            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-            document.getElementById('current-date').textContent = now.toLocaleDateString('en-US', options);
-            
-            // Portfolio chart
+        const PALETTE = ['#6c5ce7', '#00cec9', '#a29bfe', '#00b894', '#fdcb6e', '#ff7675', '#0984e3', '#e84393'];
+        let allocationChart, portfolioChart;
+
+        function initCharts() {
             const portfolioCtx = document.getElementById('portfolioChart').getContext('2d');
-            new Chart(portfolioCtx, {
+            portfolioChart = new Chart(portfolioCtx, {
                 type: 'line',
-                data: {
-                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
-                    datasets: [{
-                        label: 'Portfolio Value',
-                        data: [32000, 34500, 36800, 38200, 40100, 39500, 42500],
-                        borderColor: '#6c5ce7',
-                        backgroundColor: 'rgba(108, 92, 231, 0.1)',
-                        borderWidth: 3,
-                        tension: 0.4,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            grid: {
-                                color: 'rgba(255, 255, 255, 0.05)'
-                            },
-                            ticks: {
-                                color: '#a29bfe'
-                            }
-                        },
-                        x: {
-                            grid: {
-                                color: 'rgba(255, 255, 255, 0.05)'
-                            },
-                            ticks: {
-                                color: '#a29bfe'
-                            }
-                        }
-                    }
-                }
+                data: { labels: [], datasets: [{ label: 'Portfolio Value', data: [], borderColor: '#6c5ce7', backgroundColor: 'rgba(108, 92, 231, 0.1)', borderWidth: 3, tension: 0.4, fill: true, pointRadius: 0 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#a29bfe' } }, x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#a29bfe' } } } }
             });
 
-            // Allocation chart
             const allocationCtx = document.getElementById('allocationChart').getContext('2d');
-            new Chart(allocationCtx, {
+            allocationChart = new Chart(allocationCtx, {
                 type: 'doughnut',
-                data: {
-                    labels: ['Bitcoin', 'Ethereum', 'Solana', 'Cardano', 'Stablecoins', 'Other'],
-                    datasets: [{
-                        data: [45, 25, 12, 8, 7, 3],
-                        backgroundColor: [
-                            '#6c5ce7',
-                            '#00cec9',
-                            '#a29bfe',
-                            '#00b894',
-                            '#fdcb6e',
-                            '#ff7675'
-                        ],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'right',
-                            labels: {
-                                color: '#f5f6fa',
-                                font: {
-                                    family: 'Poppins, sans-serif'
-                                }
-                            }
-                        }
-                    }
-                }
+                data: { labels: [], datasets: [{ data: [], backgroundColor: PALETTE, borderWidth: 0 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#f5f6fa', font: { family: 'Poppins, sans-serif' } } }, tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed.toFixed(1)}%` } } }, cutout: '60%' }
             });
+        }
+
+        async function loadPortfolio() {
+            const f = window.CryptoHubAPI.format;
+            const data = await window.CryptoHubAPI.getPortfolio('demo');
+            const badge = document.querySelector('[data-live-badge]');
+
+            // Fall back to a live market snapshot for a demo allocation when the
+            // backend/portfolio isn't available (e.g. opened as a static file).
+            let holdings, totalValue, live;
+            if (data && data.holdings && data.holdings.length && data.live) {
+                holdings = data.holdings; totalValue = data.totalValue; live = true;
+            } else {
+                const { coins } = await window.CryptoHubAPI.getMarkets(['bitcoin', 'ethereum', 'solana', 'cardano']);
+                const demoAmts = { bitcoin: 0.3542, ethereum: 4.82, solana: 45, cardano: 5200 };
+                holdings = coins.map((c) => ({ coinId: c.id, name: c.name, symbol: c.symbol, amount: demoAmts[c.id] || 0, price: c.price, value: (demoAmts[c.id] || 0) * c.price, change24h: c.change24h }));
+                totalValue = holdings.reduce((s, h) => s + h.value, 0);
+                live = false;
+            }
+            if (badge) { badge.textContent = live ? '● Live' : '● Demo'; badge.style.color = live ? '#00b894' : '#fdcb6e'; }
+
+            // Weighted 24h change across the portfolio.
+            const weighted = totalValue > 0 ? holdings.reduce((s, h) => s + (h.change24h || 0) * (h.value / totalValue), 0) : 0;
+            const dayDelta = totalValue - totalValue / (1 + weighted / 100);
+
+            const set = (sel, txt) => { const el = document.querySelector(sel); if (el) el.textContent = txt; };
+            set('[data-portfolio-total]', f.usd(totalValue));
+            set('[data-portfolio-count]', String(holdings.length));
+            const up = weighted >= 0;
+            const changeEl = document.querySelector('[data-portfolio-change]');
+            if (changeEl) changeEl.innerHTML = `<i class="fas fa-arrow-${up ? 'up' : 'down'}"></i> ${f.usd(Math.abs(dayDelta))} (${f.percent(weighted)})`;
+            if (changeEl) changeEl.className = 'summary-change ' + (up ? 'positive' : 'negative');
+            const d24 = document.querySelector('[data-portfolio-24h]');
+            if (d24) { d24.textContent = (up ? '+' : '-') + f.usd(Math.abs(dayDelta)); d24.className = 'summary-value ' + (up ? 'positive' : 'negative'); }
+            const d24p = document.querySelector('[data-portfolio-24h-pct]');
+            if (d24p) d24p.innerHTML = `<i class="fas fa-chart-line"></i> ${f.percent(weighted)} (24h)`;
+
+            // Allocation doughnut from real holding values.
+            const sorted = holdings.slice().sort((a, b) => b.value - a.value);
+            allocationChart.data.labels = sorted.map((h) => h.name || h.coinId);
+            allocationChart.data.datasets[0].data = sorted.map((h) => totalValue > 0 ? (h.value / totalValue) * 100 : 0);
+            allocationChart.update();
+
+            // Stream live prices for held coins → live-updating total value.
+            startRealtime(holdings, live);
+        }
+
+        let priceMap = {};
+        function startRealtime(holdings, live) {
+            if (!window.CryptoHubRealtime) return;
+            holdings.forEach((h) => { priceMap[h.coinId] = { amount: h.amount, price: h.price }; });
+            const ids = holdings.map((h) => h.coinId).filter((id) => window.CryptoHubRealtime.supported(id));
+            if (!ids.length) return;
+            window.CryptoHubRealtime.start(ids);
+            window.CryptoHubRealtime.subscribe((tick) => {
+                if (priceMap[tick.id]) priceMap[tick.id].price = tick.price;
+                const total = Object.values(priceMap).reduce((s, p) => s + p.amount * p.price, 0);
+                const el = document.querySelector('[data-portfolio-total]');
+                if (el && window.CryptoHubApp) window.CryptoHubApp.flashPrice(el, total, window.CryptoHubAPI.format.usd(total));
+            });
+        }
+
+        async function loadPerformance() {
+            // Real BTC price history as a proxy for portfolio performance shape.
+            const prices = await window.CryptoHubAPI.getSparkline('bitcoin', 90);
+            if (!prices.length || !portfolioChart) return;
+            const sampled = prices.filter((_, i) => i % 3 === 0);
+            portfolioChart.data.labels = sampled.map((_, i) => `Day ${i + 1}`);
+            portfolioChart.data.datasets[0].data = sampled;
+            portfolioChart.update();
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const now = new Date();
+            const el = document.getElementById('current-date');
+            if (el) el.textContent = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            initCharts();
+            loadPortfolio();
+            loadPerformance();
+            setInterval(loadPortfolio, 60000);
         });
     </script>
 </body>

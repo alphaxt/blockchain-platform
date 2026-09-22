@@ -6,7 +6,12 @@
     <title>CryptoHub | Cryptocurrency Prices</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/shared.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="../js/api.js" defer></script>
+    <script src="../js/realtime.js" defer></script>
+    <script src="../js/wallet.js" defer></script>
+    <script src="../js/app.js" defer></script>
     <style>
         :root {
             --primary: #6c5ce7;
@@ -773,7 +778,7 @@
         </div>
         
         <div class="user-actions">
-            <button class="btn btn-outline">Connect Wallet</button>
+            <button class="btn btn-outline" data-connect-wallet data-label="Connect Wallet">Connect Wallet</button>
             <div class="user-profile">
                 <div class="avatar">JD</div>
             </div>
@@ -1045,40 +1050,68 @@
     </footer>
 
     <script>
-        // Sample cryptocurrency data
-        const cryptoData = [
-            { id: 1, name: "Bitcoin", symbol: "BTC", price: 61842.75, change: 3.2, market_cap: 1210000000000, volume: 32400000000, rank: 1 },
-            { id: 2, name: "Ethereum", symbol: "ETH", price: 3412.56, change: 1.8, market_cap: 408500000000, volume: 18700000000, rank: 2 },
-            { id: 3, name: "Tether", symbol: "USDT", price: 1.00, change: 0.0, market_cap: 83200000000, volume: 51400000000, rank: 3 },
-            { id: 4, name: "BNB", symbol: "BNB", price: 586.32, change: -0.5, market_cap: 90100000000, volume: 2100000000, rank: 4 },
-            { id: 5, name: "Solana", symbol: "SOL", price: 142.35, change: 5.6, market_cap: 62800000000, volume: 3200000000, rank: 5 },
-            { id: 6, name: "USD Coin", symbol: "USDC", price: 1.00, change: 0.0, market_cap: 53300000000, volume: 7800000000, rank: 6 },
-            { id: 7, name: "XRP", symbol: "XRP", price: 0.5321, change: -1.2, market_cap: 29400000000, volume: 1500000000, rank: 7 },
-            { id: 8, name: "Cardano", symbol: "ADA", price: 0.4621, change: -0.7, market_cap: 16400000000, volume: 420000000, rank: 8 },
-            { id: 9, name: "Dogecoin", symbol: "DOGE", price: 0.1245, change: 2.8, market_cap: 17800000000, volume: 980000000, rank: 9 },
-            { id: 10, name: "Avalanche", symbol: "AVAX", price: 36.78, change: 4.3, market_cap: 14200000000, volume: 670000000, rank: 10 }
-        ];
+        // Live coin list, populated from the CoinGecko markets endpoint.
+        let cryptoData = [];        // full fetched list
+        let viewData = [];          // filtered/sorted view currently rendered
+        let currentFilter = 'all';
+        let currentSearch = '';
+        let currentSort = 'market_cap';
+        const sparklineCharts = {}; // id -> Chart instance
 
-        // Populate the table with data
-        function populateTable() {
-            const tableBody = document.getElementById('cryptoTableBody');
-            tableBody.innerHTML = '';
-            
-            cryptoData.forEach(crypto => {
-                const row = document.createElement('tr');
-                
-                // Generate random data for sparkline
-                const sparklineData = [];
-                for (let i = 0; i < 7; i++) {
-                    sparklineData.push(Math.random() * 100 + (crypto.change > 0 ? 400 : 300));
+        const fmt = () => window.CryptoHubAPI.format;
+
+        function coinIcon(symbol) {
+            // Font Awesome only has brand icons for a few coins; fall back to a generic coin.
+            const brands = { btc: 'fab fa-bitcoin', eth: 'fab fa-ethereum' };
+            return brands[symbol.toLowerCase()] || 'fas fa-coins';
+        }
+
+        function applyView() {
+            let list = cryptoData.slice();
+            if (currentSearch) {
+                list = list.filter((c) =>
+                    c.name.toLowerCase().includes(currentSearch) ||
+                    c.symbol.toLowerCase().includes(currentSearch));
+            }
+            if (currentFilter === 'gainers') list = list.filter((c) => (c.change24h || 0) > 0);
+            else if (currentFilter === 'losers') list = list.filter((c) => (c.change24h || 0) < 0);
+            else if (currentFilter === 'top10') list = list.slice().sort((a, b) => a.rank - b.rank).slice(0, 10);
+
+            const dir = -1; // descending by default for numeric
+            list.sort((a, b) => {
+                switch (currentSort) {
+                    case 'name': return a.name.localeCompare(b.name);
+                    case 'price': return (b.price - a.price);
+                    case 'change': return ((b.change24h || 0) - (a.change24h || 0));
+                    case 'market_cap':
+                    default: return (b.marketCap - a.marketCap);
                 }
-                
+            });
+            viewData = list;
+            renderTable();
+        }
+
+        function renderTable() {
+            const tableBody = document.getElementById('cryptoTableBody');
+            const f = fmt();
+            // Destroy old sparkline charts to avoid leaks.
+            Object.values(sparklineCharts).forEach((ch) => { try { ch.destroy(); } catch (e) {} });
+            tableBody.innerHTML = '';
+
+            if (!viewData.length) {
+                tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--secondary)">No coins match your search.</td></tr>';
+                return;
+            }
+
+            viewData.forEach((crypto) => {
+                const up = (crypto.change24h || 0) >= 0;
+                const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td data-label="Rank">${crypto.rank}</td>
+                    <td data-label="Rank">${crypto.rank || '—'}</td>
                     <td data-label="Coin">
                         <div class="coin-info">
                             <div class="coin-icon">
-                                <i class="fab fa-${crypto.symbol.toLowerCase()}"></i>
+                                ${crypto.image ? `<img src="${crypto.image}" alt="${crypto.symbol}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : `<i class="${coinIcon(crypto.symbol)}"></i>`}
                             </div>
                             <div>
                                 <div class="coin-name">${crypto.name}</div>
@@ -1086,266 +1119,128 @@
                             </div>
                         </div>
                     </td>
-                    <td data-label="Price">$${crypto.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td data-label="Price" data-price="${crypto.id}">${f.usd(crypto.price)}</td>
                     <td data-label="24h %">
-                        <div class="price-change ${crypto.change >= 0 ? 'positive' : 'negative'}">
-                            ${crypto.change >= 0 ? '+' : ''}${crypto.change}%
+                        <div class="price-change ${up ? 'positive' : 'negative'}" data-change="${crypto.id}">
+                            ${f.percent(crypto.change24h)}
                         </div>
                     </td>
-                    <td data-label="Market Cap">$${(crypto.market_cap / 1000000000).toFixed(2)}B</td>
-                    <td data-label="Volume(24h)">$${(crypto.volume / 1000000).toFixed(2)}M</td>
+                    <td data-label="Market Cap">${f.compact(crypto.marketCap)}</td>
+                    <td data-label="Volume(24h)">${f.compact(crypto.volume)}</td>
                     <td data-label="Last 7 Days">
                         <div class="sparkline-chart">
                             <canvas id="sparkline-${crypto.id}"></canvas>
                         </div>
                     </td>
                 `;
-                
+                // Keep raw price for flash comparisons.
+                const priceCell = row.querySelector('[data-price]');
+                if (priceCell) priceCell.dataset.rawPrice = String(crypto.price);
                 tableBody.appendChild(row);
-                
-                // Create sparkline chart
-                setTimeout(() => {
-                    const ctx = document.getElementById(`sparkline-${crypto.id}`).getContext('2d');
-                    new Chart(ctx, {
+
+                // Real 7-day sparkline from the fetched data (sampled to ~24 points).
+                const el = document.getElementById(`sparkline-${crypto.id}`);
+                if (el) {
+                    const series = crypto.sparkline && crypto.sparkline.length
+                        ? crypto.sparkline.filter((_, i) => i % 7 === 0)
+                        : [1, 1];
+                    sparklineCharts[crypto.id] = new Chart(el.getContext('2d'), {
                         type: 'line',
                         data: {
-                            labels: Array(7).fill(''),
-                            datasets: [{
-                                data: sparklineData,
-                                borderColor: crypto.change >= 0 ? '#00cec9' : '#ff7675',
-                                borderWidth: 2,
-                                pointRadius: 0,
-                                tension: 0.3,
-                                fill: false
-                            }]
+                            labels: series.map(() => ''),
+                            datasets: [{ data: series, borderColor: up ? '#00cec9' : '#ff7675', borderWidth: 2, pointRadius: 0, tension: 0.3, fill: false }]
                         },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    display: false
-                                }
-                            },
-                            scales: {
-                                y: {
-                                    display: false
-                                },
-                                x: {
-                                    display: false
-                                }
-                            }
-                        }
+                        options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { display: false } } }
                     });
-                }, 100);
+                }
             });
         }
 
-        // Sort table function
-        function sortTable(column, ascending) {
-            cryptoData.sort((a, b) => {
-                let valueA, valueB;
-                
-                switch(column) {
-                    case 'rank':
-                        valueA = a.rank;
-                        valueB = b.rank;
-                        break;
-                    case 'name':
-                        valueA = a.name;
-                        valueB = b.name;
-                        break;
-                    case 'price':
-                        valueA = a.price;
-                        valueB = b.price;
-                        break;
-                    case 'change':
-                        valueA = a.change;
-                        valueB = b.change;
-                        break;
-                    case 'market_cap':
-                        valueA = a.market_cap;
-                        valueB = b.market_cap;
-                        break;
-                    case 'volume':
-                        valueA = a.volume;
-                        valueB = b.volume;
-                        break;
-                    default:
-                        return 0;
+        async function loadCoins() {
+            const badge = document.querySelector('[data-live-badge]');
+            const { getTopCoins } = window.CryptoHubAPI;
+            const coins = await getTopCoins(50, 1);
+            if (coins.length) {
+                cryptoData = coins;
+                if (badge) { badge.textContent = '● Live'; badge.style.color = '#00b894'; }
+            } else {
+                // Fallback snapshot so the table is never empty.
+                const { coins: fb } = await window.CryptoHubAPI.getMarkets();
+                cryptoData = fb.map((c, i) => ({ id: c.id, rank: i + 1, name: c.name, symbol: c.symbol, price: c.price, change24h: c.change24h, marketCap: c.marketCap, volume: c.volume, sparkline: [] }));
+                if (badge) { badge.textContent = '● Offline (cached)'; badge.style.color = '#fdcb6e'; }
+            }
+            applyView();
+            startRealtime();
+        }
+
+        // Stream live prices into visible rows (top supported coins).
+        function startRealtime() {
+            if (!window.CryptoHubRealtime) return;
+            const ids = cryptoData.map((c) => c.id).filter((id) => window.CryptoHubRealtime.supported(id));
+            if (!ids.length) return;
+            window.CryptoHubRealtime.start(ids);
+            window.CryptoHubRealtime.subscribe((tick) => {
+                const f = fmt();
+                const priceEl = document.querySelector(`[data-price="${tick.id}"]`);
+                const changeEl = document.querySelector(`[data-change="${tick.id}"]`);
+                if (priceEl && window.CryptoHubApp) window.CryptoHubApp.flashPrice(priceEl, tick.price, f.usd(tick.price));
+                if (changeEl && tick.changePercent != null) {
+                    changeEl.textContent = f.percent(tick.changePercent);
+                    changeEl.className = 'price-change ' + (tick.changePercent >= 0 ? 'positive' : 'negative');
                 }
-                
-                if (typeof valueA === 'string') {
-                    return ascending 
-                        ? valueA.localeCompare(valueB)
-                        : valueB.localeCompare(valueA);
-                } else {
-                    return ascending 
-                        ? valueA - valueB
-                        : valueB - valueA;
-                }
+                // Keep the underlying model current for re-renders.
+                const model = cryptoData.find((c) => c.id === tick.id);
+                if (model) { model.price = tick.price; model.change24h = tick.changePercent; }
             });
-            
-            populateTable();
+        }
+
+        function renderFeatured(canvasId, id, color) {
+            const el = document.getElementById(canvasId);
+            if (!el) return;
+            window.CryptoHubAPI.getSparkline(id, 365).then((prices) => {
+                const series = prices.length ? prices.filter((_, i) => i % 15 === 0) : [1, 1];
+                new Chart(el.getContext('2d'), {
+                    type: 'line',
+                    data: { labels: series.map(() => ''), datasets: [{ data: series, borderColor: color, backgroundColor: color.replace(')', ', 0.1)').replace('rgb', 'rgba'), borderWidth: 3, tension: 0.4, fill: true, pointRadius: 0 }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { display: false } } }
+                });
+            });
         }
 
         // Initialize page
         document.addEventListener('DOMContentLoaded', function() {
-            // Populate table with data
-            populateTable();
-            
-            // Set up sorting
+            loadCoins();
+            setInterval(loadCoins, 120000); // refresh full list every 2 min
+
             const sortSelect = document.getElementById('sortSelect');
-            sortSelect.addEventListener('change', function() {
-                sortTable(this.value, false);
-            });
-            
-            // Set up search
+            if (sortSelect) sortSelect.addEventListener('change', function() { currentSort = this.value; applyView(); });
+
             const searchInput = document.getElementById('searchInput');
-            searchInput.addEventListener('input', function() {
-                const searchTerm = this.value.toLowerCase();
-                // In a real app, this would filter the data
-                console.log(`Searching for: ${searchTerm}`);
-            });
-            
-            // Set up filter buttons
-            document.querySelectorAll('.filter-btn').forEach(button => {
+            if (searchInput) searchInput.addEventListener('input', function() { currentSearch = this.value.toLowerCase().trim(); applyView(); });
+
+            document.querySelectorAll('.filter-btn').forEach((button) => {
                 button.addEventListener('click', function() {
-                    document.querySelectorAll('.filter-btn').forEach(btn => {
-                        btn.classList.remove('active');
-                    });
+                    document.querySelectorAll('.filter-btn').forEach((btn) => btn.classList.remove('active'));
                     this.classList.add('active');
-                    
-                    // In a real app, this would filter the table
-                    console.log(`Filter: ${this.textContent}`);
+                    const label = this.textContent.trim().toLowerCase();
+                    currentFilter = label.includes('gainer') ? 'gainers' : label.includes('loser') ? 'losers' : label.includes('top 10') ? 'top10' : 'all';
+                    applyView();
                 });
             });
-            
-            // Set up view toggle
-            document.querySelectorAll('.view-btn').forEach(button => {
+
+            document.querySelectorAll('.view-btn').forEach((button) => {
                 button.addEventListener('click', function() {
-                    document.querySelectorAll('.view-btn').forEach(btn => {
-                        btn.classList.remove('active');
-                    });
+                    document.querySelectorAll('.view-btn').forEach((btn) => btn.classList.remove('active'));
                     this.classList.add('active');
-                    
-                    // In a real app, this would change the view
-                    console.log(`View: ${this.querySelector('i').className.includes('th') ? 'Grid' : 'List'}`);
                 });
             });
-            
-            // Featured charts
-            // Bitcoin featured chart
-            const btcCtx = document.getElementById('btcFeaturedChart').getContext('2d');
-            new Chart(btcCtx, {
-                type: 'line',
-                data: {
-                    labels: ['1D', '1W', '1M', '3M', '6M', '1Y'],
-                    datasets: [{
-                        label: 'Bitcoin',
-                        data: [55000, 58000, 52000, 42000, 38000, 28000],
-                        borderColor: '#6c5ce7',
-                        backgroundColor: 'rgba(108, 92, 231, 0.1)',
-                        borderWidth: 3,
-                        tension: 0.4,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            display: false
-                        },
-                        x: {
-                            ticks: {
-                                color: '#8a94a6'
-                            }
-                        }
-                    }
-                }
-            });
-            
-            // Ethereum featured chart
-            const ethCtx = document.getElementById('ethFeaturedChart').getContext('2d');
-            new Chart(ethCtx, {
-                type: 'line',
-                data: {
-                    labels: ['1D', '1W', '1M', '3M', '6M', '1Y'],
-                    datasets: [{
-                        label: 'Ethereum',
-                        data: [3200, 3100, 2900, 2600, 2200, 1800],
-                        borderColor: '#00cec9',
-                        backgroundColor: 'rgba(0, 206, 201, 0.1)',
-                        borderWidth: 3,
-                        tension: 0.4,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            display: false
-                        },
-                        x: {
-                            ticks: {
-                                color: '#8a94a6'
-                            }
-                        }
-                    }
-                }
-            });
-            
-            // Solana featured chart
-            const solCtx = document.getElementById('solFeaturedChart').getContext('2d');
-            new Chart(solCtx, {
-                type: 'line',
-                data: {
-                    labels: ['1D', '1W', '1M', '3M', '6M', '1Y'],
-                    datasets: [{
-                        label: 'Solana',
-                        data: [140, 135, 110, 95, 70, 40],
-                        borderColor: '#fdcb6e',
-                        backgroundColor: 'rgba(253, 203, 110, 0.1)',
-                        borderWidth: 3,
-                        tension: 0.4,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            display: false
-                        },
-                        x: {
-                            ticks: {
-                                color: '#8a94a6'
-                            }
-                        }
-                    }
-                }
-            });
+
+            // Featured charts use real 1-year history.
+            renderFeatured('btcFeaturedChart', 'bitcoin', 'rgb(108, 92, 231)');
+            renderFeatured('ethFeaturedChart', 'ethereum', 'rgb(0, 206, 201)');
+            renderFeatured('solFeaturedChart', 'solana', 'rgb(253, 203, 110)');
         });
+
     </script>
 </body>
 </html>

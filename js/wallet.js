@@ -129,6 +129,87 @@
     };
   }
 
+  function ethToWeiHex(eth) {
+    // Convert a decimal ETH string/number to a hex wei value without float loss.
+    const [whole, frac = ''] = String(eth).split('.');
+    const fracPadded = (frac + '0'.repeat(18)).slice(0, 18);
+    const wei = BigInt(whole || '0') * (10n ** 18n) + BigInt(fracPadded || '0');
+    return '0x' + wei.toString(16);
+  }
+
+  /**
+   * Send a native ETH transfer through the connected wallet.
+   * @param {string} to recipient address (0x...)
+   * @param {string|number} amountEth amount in ETH
+   * @returns {Promise<string>} the transaction hash
+   */
+  async function sendEth(to, amountEth) {
+    if (!hasProvider()) throw new Error('No Web3 wallet found.');
+    if (!state.account) throw new Error('Connect a wallet first.');
+    if (!/^0x[a-fA-F0-9]{40}$/.test(to)) throw new Error('Invalid recipient address.');
+    const amt = Number(amountEth);
+    if (isNaN(amt) || amt <= 0) throw new Error('Enter a valid amount.');
+
+    const txHash = await global.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{ from: state.account, to, value: ethToWeiHex(amountEth) }]
+    });
+    // Refresh balance shortly after (tx won't be mined instantly).
+    setTimeout(() => refreshBalance().then(emit), 3000);
+    return txHash;
+  }
+
+  /**
+   * Sign a plain-text message (personal_sign) with the connected account.
+   * @param {string} message
+   * @returns {Promise<string>} the signature
+   */
+  async function signMessage(message) {
+    if (!hasProvider()) throw new Error('No Web3 wallet found.');
+    if (!state.account) throw new Error('Connect a wallet first.');
+    const hex = '0x' + Array.from(new TextEncoder().encode(message))
+      .map((b) => b.toString(16).padStart(2, '0')).join('');
+    return global.ethereum.request({ method: 'personal_sign', params: [hex, state.account] });
+  }
+
+  // Block explorer base per chain, for building tx / address links.
+  const EXPLORERS = {
+    '0x1': 'https://etherscan.io',
+    '0xaa36a7': 'https://sepolia.etherscan.io',
+    '0x5': 'https://goerli.etherscan.io',
+    '0x89': 'https://polygonscan.com',
+    '0x38': 'https://bscscan.com',
+    '0xa4b1': 'https://arbiscan.io',
+    '0xa': 'https://optimistic.etherscan.io'
+  };
+
+  function explorerBase() {
+    return EXPLORERS[state.chainId] || 'https://etherscan.io';
+  }
+
+  /** Link to the connected address on the current chain's explorer. */
+  function explorerAddressUrl(address) {
+    return explorerBase() + '/address/' + (address || state.account || '');
+  }
+
+  /** Link to a transaction hash on the current chain's explorer. */
+  function explorerTxUrl(hash) {
+    return explorerBase() + '/tx/' + hash;
+  }
+
+  /**
+   * Fetch recent transaction count (nonce) for the connected account.
+   * Full history requires an explorer API key, so we expose the nonce and
+   * an explorer link instead of scraping — honest about what's on-chain-available.
+   */
+  async function getTxCount() {
+    if (!hasProvider() || !state.account) return 0;
+    try {
+      const hex = await global.ethereum.request({ method: 'eth_getTransactionCount', params: [state.account, 'latest'] });
+      return parseInt(hex, 16);
+    } catch (e) { return 0; }
+  }
+
   // React to wallet-level events.
   if (hasProvider()) {
     global.ethereum.on('accountsChanged', async (accounts) => {
@@ -149,10 +230,16 @@
     disconnect,
     restore,
     switchChain,
+    sendEth,
+    signMessage,
+    getTxCount,
+    explorerAddressUrl,
+    explorerTxUrl,
     onChange,
     hasProvider,
     shorten,
     getState: () => Object.assign({}, state),
-    CHAINS
+    CHAINS,
+    EXPLORERS
   };
 })(window);
