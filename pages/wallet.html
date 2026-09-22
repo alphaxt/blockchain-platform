@@ -556,12 +556,12 @@
                             <p class="action-desc">Transfer to bank account</p>
                         </div>
                         
-                        <div class="action-card">
+                        <div class="action-card" data-action="swap" style="cursor:pointer;">
                             <div class="action-icon">
                                 <i class="fas fa-exchange-alt"></i>
                             </div>
                             <h3 class="action-title">Swap</h3>
-                            <p class="action-desc">Exchange assets instantly</p>
+                            <p class="action-desc">Wrap / unwrap ETH &harr; WETH</p>
                         </div>
                         
                         <div class="action-card" data-action="send" style="cursor:pointer;">
@@ -892,6 +892,29 @@
                     window.open(W.explorerTxUrl(hash), '_blank', 'noopener');
                 } catch (e) {
                     if (App) App.toast('Send failed: ' + (e.code === 4001 ? 'rejected' : e.message), 'error');
+                }
+            });
+
+            // On-chain swap flow: wrap/unwrap native ETH <-> WETH via the
+            // canonical WETH9 contract (real on-chain tx, no API key needed).
+            const swapCard = document.querySelector('[data-action="swap"]');
+            if (swapCard) swapCard.addEventListener('click', async () => {
+                const s = W.getState();
+                if (!s.connected) { if (App) App.toast('Connect your wallet first', 'warning'); return; }
+                if (!W.swapSupported()) { if (App) App.toast('Swaps are not supported on ' + (s.chainName || 'this network'), 'warning'); return; }
+                const sym = W.wrappedSymbol();
+                const dir = prompt(`Swap direction — type "wrap" (ETH → ${sym}) or "unwrap" (${sym} → ETH):`, 'wrap');
+                if (!dir) return;
+                const d = dir.trim().toLowerCase();
+                if (d !== 'wrap' && d !== 'unwrap') { if (App) App.toast('Type "wrap" or "unwrap".', 'error'); return; }
+                const amount = prompt(`Amount to ${d} (${d === 'wrap' ? 'ETH' : sym}):`);
+                if (!amount) return;
+                try {
+                    const hash = await W.swap(d, amount.trim());
+                    if (App) App.toast(`${d === 'wrap' ? 'Wrap' : 'Unwrap'} sent: ` + hash.slice(0, 10) + '…', 'success');
+                    window.open(W.explorerTxUrl(hash), '_blank', 'noopener');
+                } catch (e) {
+                    if (App) App.toast('Swap failed: ' + (e.code === 4001 ? 'rejected' : e.message), 'error');
                 }
             });
         }

@@ -210,6 +210,114 @@
     } catch (e) { return 0; }
   }
 
+  // --- On-chain swap: native ETH <-> Wrapped ETH (WETH) ----------------
+  // A real, key-less swap that works through any EIP-1193 provider by
+  // calling the canonical WETH9 contract directly. Wrapping ETH->WETH is
+  // deposit() (payable); unwrapping WETH->ETH is withdraw(uint256).
+  // Canonical WETH (or wrapped-native) contract per chain.
+  const WETH_ADDRESSES = {
+    '0x1':      '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // Ethereum WETH9
+    '0xaa36a7': '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14', // Sepolia WETH
+    '0x5':      '0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6', // Goerli WETH
+    '0x89':     '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270', // Polygon WMATIC
+    '0x38':     '0xBB4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c', // BSC WBNB
+    '0xa4b1':   '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1', // Arbitrum WETH
+    '0xa':      '0x4200000000000000000000000000000000000006'  // Optimism WETH
+  };
+  // Wrapped-native symbol per chain (for accurate UI labels).
+  const WRAPPED_SYMBOL = { '0x89': 'WMATIC', '0x38': 'WBNB' };
+
+  const WETH_SELECTORS = {
+    deposit:   '0xd0e30db0',                                           // deposit()
+    withdraw:  '0x2e1a7d4d',                                           // withdraw(uint256)
+    balanceOf: '0x70a08231'                                            // balanceOf(address)
+  };
+
+  function wethAddress() {
+    const addr = WETH_ADDRESSES[state.chainId];
+    if (!addr) throw new Error('Swaps are not supported on this network.');
+    return addr;
+  }
+
+  /** Symbol shown for the wrapped token on the current chain (WETH by default). */
+  function wrappedSymbol() {
+    return WRAPPED_SYMBOL[state.chainId] || 'WETH';
+  }
+
+  function pad32(hexNo0x) {
+    return hexNo0x.padStart(64, '0');
+  }
+
+  /**
+   * Wrap native ETH into WETH by calling WETH9.deposit() with value.
+   * @param {string|number} amountEth amount of ETH to wrap
+   * @returns {Promise<string>} transaction hash
+   */
+  async function wrapEth(amountEth) {
+    if (!hasProvider()) throw new Error('No Web3 wallet found.');
+    if (!state.account) throw new Error('Connect a wallet first.');
+    const amt = Number(amountEth);
+    if (isNaN(amt) || amt <= 0) throw new Error('Enter a valid amount.');
+    const txHash = await global.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{ from: state.account, to: wethAddress(), value: ethToWeiHex(amountEth), data: WETH_SELECTORS.deposit }]
+    });
+    setTimeout(() => refreshBalance().then(emit), 3000);
+    return txHash;
+  }
+
+  /**
+   * Unwrap WETH back into native ETH by calling WETH9.withdraw(amount).
+   * @param {string|number} amountEth amount of WETH to unwrap
+   * @returns {Promise<string>} transaction hash
+   */
+  async function unwrapEth(amountEth) {
+    if (!hasProvider()) throw new Error('No Web3 wallet found.');
+    if (!state.account) throw new Error('Connect a wallet first.');
+    const amt = Number(amountEth);
+    if (isNaN(amt) || amt <= 0) throw new Error('Enter a valid amount.');
+    const amountWeiHex = ethToWeiHex(amountEth).slice(2); // strip 0x
+    const data = WETH_SELECTORS.withdraw + pad32(amountWeiHex);
+    const txHash = await global.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{ from: state.account, to: wethAddress(), data }]
+    });
+    setTimeout(() => refreshBalance().then(emit), 3000);
+    return txHash;
+  }
+
+  /**
+   * Read the connected account's WETH balance via eth_call (no tx, no gas).
+   * @returns {Promise<number>} WETH balance in ether units
+   */
+  async function getWethBalance() {
+    if (!hasProvider() || !state.account) return 0;
+    try {
+      const data = WETH_SELECTORS.balanceOf + pad32(state.account.toLowerCase().replace(/^0x/, ''));
+      const hex = await global.ethereum.request({
+        method: 'eth_call',
+        params: [{ to: wethAddress(), data }, 'latest']
+      });
+      return weiToEth(hex);
+    } catch (e) { return 0; }
+  }
+
+  /** Whether native<->wrapped swaps are available on the current chain. */
+  function swapSupported() {
+    return !!WETH_ADDRESSES[state.chainId];
+  }
+
+  /**
+   * Convenience wrapper: swap in a direction with a single call.
+   * @param {'wrap'|'unwrap'} direction
+   * @param {string|number} amount
+   */
+  async function swap(direction, amount) {
+    if (direction === 'wrap') return wrapEth(amount);
+    if (direction === 'unwrap') return unwrapEth(amount);
+    throw new Error('Unknown swap direction: ' + direction);
+  }
+
   // React to wallet-level events.
   if (hasProvider()) {
     global.ethereum.on('accountsChanged', async (accounts) => {
@@ -233,6 +341,12 @@
     sendEth,
     signMessage,
     getTxCount,
+    wrapEth,
+    unwrapEth,
+    swap,
+    getWethBalance,
+    swapSupported,
+    wrappedSymbol,
     explorerAddressUrl,
     explorerTxUrl,
     onChange,
