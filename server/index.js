@@ -123,6 +123,18 @@ app.get('/api/auth/me', (req, res) => {
   res.json({ authenticated: !!req.user, address: req.user || null });
 });
 
+// POST /api/auth/refresh -> exchange a still-valid Bearer token for a fresh
+// one (sliding expiry). Supports long-lived, multi-device sessions.
+app.post('/api/auth/refresh', (req, res) => {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  try {
+    res.json(auth.refreshToken(token || ''));
+  } catch (err) {
+    res.status(401).json({ error: err.message });
+  }
+});
+
 // GET /api/markets?ids=bitcoin,ethereum -> live market data (cached 30s)
 app.get('/api/markets', async (req, res) => {
   const ids = (req.query.ids ? String(req.query.ids).split(',') : DEFAULT_IDS)

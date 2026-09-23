@@ -188,6 +188,26 @@ test('auth: invalid/garbage token is treated as anonymous', async () => {
   assert.strictEqual(me.json.authenticated, false);
 });
 
+test('auth: refresh exchanges a valid token for a fresh one', async () => {
+  const w = makeWallet();
+  const token = await signIn(w);
+  const r = await req('POST', '/api/auth/refresh', null, { Authorization: 'Bearer ' + token });
+  assert.strictEqual(r.status, 200);
+  assert.ok(r.json.token, 'returns a new token');
+  assert.strictEqual(r.json.address, w.address.toLowerCase());
+  // The refreshed token authenticates the same wallet.
+  const me = await req('GET', '/api/auth/me', null, { Authorization: 'Bearer ' + r.json.token });
+  assert.strictEqual(me.json.authenticated, true);
+  assert.strictEqual(me.json.address, w.address.toLowerCase());
+});
+
+test('auth: refresh rejects a missing or invalid token', async () => {
+  const none = await req('POST', '/api/auth/refresh');
+  assert.strictEqual(none.status, 401);
+  const bad = await req('POST', '/api/auth/refresh', null, { Authorization: 'Bearer bad.token.here' });
+  assert.strictEqual(bad.status, 401);
+});
+
 test('auth: portfolios are isolated per authenticated wallet', async () => {
   const a = makeWallet();
   const b = makeWallet();

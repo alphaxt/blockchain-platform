@@ -164,6 +164,18 @@ function verifyToken(token) {
 }
 
 /**
+ * Exchange a still-valid token for a fresh one (sliding expiry). Lets a
+ * device keep its session alive without re-signing, and supports multiple
+ * independent devices per address. Throws if the token is invalid/expired.
+ * @returns {{address:string, token:string, expires:number}}
+ */
+function refreshToken(token) {
+  const address = verifyToken(token);
+  if (!address) throw new Error('Invalid or expired token');
+  return issueToken(address);
+}
+
+/**
  * Express middleware. Reads a Bearer token and sets req.user to the
  * authenticated address. If `required` is true, rejects unauthenticated
  * requests with 401; otherwise leaves req.user undefined and continues
@@ -187,6 +199,7 @@ module.exports = {
   recoverAddress,
   verifyToken,
   issueToken,
+  refreshToken,
   authMiddleware,
   loginMessage,
   isAddress
