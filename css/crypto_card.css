@@ -1,0 +1,455 @@
+/* CryptoHub - crypto_card page styles */
+/* Main Content */
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Card Hero Section */
+.card-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 3rem 0;
+    padding: 3rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.card-hero::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(108, 92, 231, 0.1) 0%, rgba(18, 24, 38, 0) 70%);
+    z-index: -1;
+}
+
+.card-content {
+    max-width: 600px;
+    z-index: 2;
+}
+
+.card-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 3.5rem;
+    line-height: 1.1;
+    margin-bottom: 1.5rem;
+    background: linear-gradient(90deg, var(--light), var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.card-subtitle {
+    font-size: 1.2rem;
+    color: var(--secondary);
+    margin-bottom: 2rem;
+    max-width: 500px;
+}
+
+.card-features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.feature-tag {
+    background: rgba(108, 92, 231, 0.2);
+    padding: 0.6rem 1.2rem;
+    border-radius: 50px;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-image {
+    position: relative;
+    perspective: 1000px;
+}
+
+.crypto-card {
+    width: 380px;
+    height: 240px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #6c5ce7, #00cec9);
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 15px 35px rgba(108, 92, 231, 0.4);
+    transform: rotateY(-15deg);
+    transition: transform 0.5s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.crypto-card:hover {
+    transform: rotateY(-5deg);
+}
+
+.card-logo {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.card-logo img {
+    height: 40px;
+    filter: brightness(0) invert(1);
+}
+
+.card-number {
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 3px;
+    font-size: 1.4rem;
+    margin: 1rem 0;
+}
+
+.card-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+}
+
+.card-holder, .card-expiry {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+}
+
+.card-name {
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-top: 0.3rem;
+}
+
+.card-chip {
+    position: absolute;
+    bottom: 2rem;
+    left: 2rem;
+    width: 50px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.card-chip i {
+    font-size: 1.8rem;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Benefits Section */
+.section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2rem;
+    margin: 3rem 0 1.5rem;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.section-title i {
+    background: rgba(0, 206, 201, 0.2);
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.benefits-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-bottom: 3rem;
+}
+
+.benefit-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    padding: 2rem;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(108, 92, 231, 0.1);
+    display: flex;
+    flex-direction: column;
+}
+
+.benefit-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    border-color: rgba(108, 92, 231, 0.3);
+}
+
+.benefit-icon {
+    font-size: 2.5rem;
+    color: var(--accent);
+    margin-bottom: 1.5rem;
+}
+
+.benefit-title {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.benefit-description {
+    color: var(--secondary);
+    margin-bottom: 1.5rem;
+    flex-grow: 1;
+}
+
+.benefit-highlight {
+    background: rgba(0, 206, 201, 0.1);
+    padding: 0.8rem;
+    border-radius: 10px;
+    border-left: 3px solid var(--accent);
+    font-weight: 500;
+}
+
+/* How It Works */
+.how-it-works {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    padding: 3rem;
+    margin: 4rem 0;
+    border: 1px solid rgba(108, 92, 231, 0.2);
+}
+
+.steps-container {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 3rem;
+    position: relative;
+}
+
+.steps-container::before {
+    content: '';
+    position: absolute;
+    top: 60px;
+    left: 50px;
+    right: 50px;
+    height: 3px;
+    background: rgba(108, 92, 231, 0.3);
+    z-index: 1;
+}
+
+.step {
+    text-align: center;
+    position: relative;
+    z-index: 2;
+    flex: 1;
+    padding: 0 1rem;
+}
+
+.step-number {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 auto 1.5rem;
+}
+
+.step-title {
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.step-description {
+    color: var(--secondary);
+}
+
+/* Fees & Limits */
+.fees-section {
+    margin: 4rem 0;
+}
+
+.fees-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.fee-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    padding: 1.5rem;
+    border: 1px solid rgba(108, 92, 231, 0.1);
+}
+
+.fee-title {
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.fee-list {
+    list-style: none;
+}
+
+.fee-list li {
+    padding: 0.8rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    justify-content: space-between;
+}
+
+.fee-list li:last-child {
+    border-bottom: none;
+}
+
+.fee-name {
+    color: var(--secondary);
+}
+
+.fee-value {
+    font-weight: 500;
+}
+
+/* FAQ Section */
+.faq-section {
+    margin: 4rem 0;
+}
+
+.faq-container {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    padding: 2rem;
+    border: 1px solid rgba(108, 92, 231, 0.2);
+}
+
+.faq-item {
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 1.5rem;
+}
+
+.faq-item:last-child {
+    margin-bottom: 0;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.faq-question {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.faq-answer {
+    color: var(--secondary);
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+
+.faq-answer.open {
+    max-height: 200px;
+}
+
+/* CTA Section */
+.cta-section {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: linear-gradient(135deg, rgba(108, 92, 231, 0.1), rgba(0, 206, 201, 0.1));
+    border-radius: 20px;
+    margin: 4rem 0;
+    border: 1px solid rgba(108, 92, 231, 0.2);
+}
+
+.cta-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2.5rem;
+    margin-bottom: 1.5rem;
+    background: linear-gradient(90deg, var(--light), var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.cta-subtitle {
+    font-size: 1.2rem;
+    color: var(--secondary);
+    margin-bottom: 2rem;
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Responsive Design */
+@media (max-width: 1100px) {
+    .card-hero {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .card-content {
+        margin-bottom: 3rem;
+        max-width: 100%;
+    }
+    
+    .card-features {
+        justify-content: center;
+    }
+    
+    .steps-container {
+        flex-direction: column;
+        gap: 3rem;
+    }
+    
+    .steps-container::before {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .header {
+        flex-direction: column;
+        padding: 1rem;
+        gap: 1rem;
+    }
+    
+    .nav {
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .search-bar {
+        width: 100%;
+        max-width: 500px;
+    }
+    
+    .card-title {
+        font-size: 2.5rem;
+    }
+    
+    .crypto-card {
+        width: 100%;
+        max-width: 350px;
+    }
+}

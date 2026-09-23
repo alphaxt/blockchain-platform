@@ -1,0 +1,235 @@
+/* CryptoHub - privacy_terms page styles */
+body {
+    font-family: 'Poppins', sans-serif;
+    background: linear-gradient(135deg, #0f1729, #1a243f);
+    color: var(--light);
+    line-height: 1.6;
+    overflow-x: hidden;
+}
+
+/* Header & Navigation */
+
+.logo-text {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.8rem;
+    font-weight: 700;
+    background: linear-gradient(90deg, var(--accent), var(--vibrant-1));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.nav-link:hover {
+    background: rgba(108, 92, 231, 0.2);
+}
+
+/* Main Container */
+.legal-container {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 2rem;
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 2rem;
+}
+
+/* Sidebar Navigation */
+.legal-nav {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    padding: 1.5rem;
+    height: fit-content;
+    position: sticky;
+    top: 100px;
+    border: 1px solid rgba(108, 92, 231, 0.2);
+}
+
+.legal-nav h3 {
+    font-family: 'Orbitron', sans-serif;
+    color: var(--accent);
+    margin-bottom: 1.5rem;
+    font-size: 1.3rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(108, 92, 231, 0.3);
+}
+
+.legal-nav ul {
+    list-style: none;
+}
+
+.legal-nav li {
+    margin-bottom: 0.8rem;
+}
+
+.legal-nav a {
+    color: var(--secondary);
+    text-decoration: none;
+    transition: all 0.3s ease;
+    display: block;
+    padding: 0.5rem;
+    border-radius: 8px;
+}
+
+.legal-nav a:hover, .legal-nav a.active {
+    background: rgba(108, 92, 231, 0.2);
+    color: var(--light);
+}
+
+/* Legal Content */
+.legal-content {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    padding: 3rem;
+    border: 1px solid rgba(108, 92, 231, 0.2);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.legal-header {
+    margin-bottom: 2rem;
+    text-align: center;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(108, 92, 231, 0.3);
+}
+
+.legal-header h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    background: linear-gradient(90deg, var(--accent), var(--vibrant-1));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.legal-header p {
+    color: var(--secondary);
+    font-size: 1.1rem;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.legal-section {
+    margin-bottom: 3rem;
+}
+
+.legal-section h2 {
+    font-family: 'Orbitron', sans-serif;
+    color: var(--accent);
+    margin-bottom: 1.5rem;
+    font-size: 1.8rem;
+    position: relative;
+    padding-left: 1.5rem;
+}
+
+.legal-section h2:before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--vibrant-1);
+}
+
+.legal-section p {
+    margin-bottom: 1.2rem;
+    color: #d0d0e0;
+    line-height: 1.8;
+}
+
+.legal-section ul {
+    margin: 1.5rem 0;
+    padding-left: 2rem;
+}
+
+.legal-section li {
+    margin-bottom: 1rem;
+    color: #d0d0e0;
+}
+
+.highlight {
+    background: rgba(108, 92, 231, 0.15);
+    border-left: 3px solid var(--vibrant-1);
+    padding: 1.5rem;
+    border-radius: 0 8px 8px 0;
+    margin: 1.5rem 0;
+}
+
+.update-date {
+    font-style: italic;
+    color: var(--secondary);
+    margin-top: 2rem;
+    text-align: right;
+    font-size: 0.9rem;
+}
+
+.legal-tabs {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid rgba(108, 92, 231, 0.3);
+    padding-bottom: 1rem;
+}
+
+.legal-tab {
+    padding: 0.8rem 1.5rem;
+    border-radius: 50px;
+    background: rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.legal-tab.active {
+    background: linear-gradient(90deg, var(--primary), var(--vibrant-1));
+    color: white;
+}
+
+.legal-tab:hover:not(.active) {
+    background: rgba(108, 92, 231, 0.2);
+}
+
+/* Responsive Design */
+@media (max-width: 1100px) {
+    .legal-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .legal-nav {
+        position: relative;
+        top: 0;
+    }
+}
+
+@media (max-width: 768px) {
+    .header {
+        flex-direction: column;
+        padding: 1rem;
+        gap: 1rem;
+    }
+    
+    .nav {
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .search-bar {
+        width: 100%;
+        max-width: 500px;
+    }
+    
+    .legal-content {
+        padding: 1.5rem;
+    }
+    
+    .legal-header h1 {
+        font-size: 2rem;
+    }
+    
+    .legal-tabs {
+        flex-wrap: wrap;
+    }
+}

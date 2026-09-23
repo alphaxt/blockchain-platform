@@ -89,7 +89,8 @@ blockchain-platform/
 ├── index.html              # Homepage (entry point)
 ├── pages/                  # All other pages (markets, wallet, nft, ...)
 ├── css/
-│   └── shared.css          # Shared design tokens + utility classes
+│   ├── shared.css          # Shared tokens + site chrome (header/nav/footer/buttons)
+│   └── <page>.css          # Per-page styles (index.css, dashboard.css, wallet.css, ...)
 ├── js/
 │   ├── api.js              # Market data service (backend → CoinGecko → fallback)
 │   ├── realtime.js         # Real-time price stream (Binance WebSocket + polling fallback)
@@ -245,6 +246,9 @@ configure it — everything else keeps working.
 
 - Token → token swaps (routing through an intermediate pair); ETH ↔ token is supported in both directions today
 - Price-impact display and configurable slippage in the swap UI
+
+Each page now loads shared chrome from `css/shared.css` plus its own `css/<page>.css`;
+only page-specific `:root` token overrides remain inline in the HTML.
 
 ---
 
