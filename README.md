@@ -45,6 +45,7 @@ You can run it two ways:
 **Wallet-based sign-in (Sign-In With Ethereum)**
 - Prove control of an address by signing a server-issued nonce (`personal_sign`) — no passwords
 - The server recovers the signer from the signature (secp256k1 + keccak256 via the audited `@noble/*` libraries) and issues an HMAC-signed session token
+- Nonces are single-use and persisted in SQLite (with automatic expiry cleanup), and the token-signing secret is durable, so sign-in survives server restarts
 - Signed-in users get their **own** persisted portfolio and watchlist; unauthenticated requests fall back to a shared `demo` scope
 
 **Backend API (optional)**
@@ -222,7 +223,7 @@ configure it — everything else keeps working.
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `PORT` | Server port | `3000` |
-| `AUTH_SECRET` | HMAC secret for signing session tokens | random per process (set this in production so tokens survive restarts) |
+| `AUTH_SECRET` | HMAC secret for signing session tokens | when unset, a random secret is generated and **persisted in SQLite** (`settings` table) so tokens survive restarts on a single instance; set it explicitly for multi-instance deploys |
 | `walletconnect-project-id` / `window.CRYPTOHUB_WC_PROJECT_ID` | Enables WalletConnect (client-side) | unset |
 
 ---

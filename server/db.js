@@ -30,6 +30,17 @@ db.exec(`
     updated_at INTEGER NOT NULL,
     UNIQUE(user, coin_id)
   );
+
+  CREATE TABLE IF NOT EXISTS auth_nonces (
+    address TEXT PRIMARY KEY,
+    nonce TEXT NOT NULL,
+    expires INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `);
 
 // Migration: earlier versions had a watchlist keyed only by coin_id (no
@@ -98,4 +109,38 @@ const Holdings = {
   }
 };
 
-module.exports = { db, Watchlist, Holdings };
+// --- Auth nonces (persisted, so sign-in survives restarts / scales) --
+const Nonces = {
+  put(address, nonce, expires) {
+    db.prepare(
+      `INSERT INTO auth_nonces (address, nonce, expires) VALUES (?, ?, ?)
+       ON CONFLICT(address) DO UPDATE SET nonce = excluded.nonce, expires = excluded.expires`
+    ).run(address, nonce, expires);
+  },
+  get(address) {
+    return db.prepare('SELECT nonce, expires FROM auth_nonces WHERE address = ?').get(address) || null;
+  },
+  remove(address) {
+    db.prepare('DELETE FROM auth_nonces WHERE address = ?').run(address);
+  },
+  // Opportunistically drop expired rows so the table doesn't grow.
+  cleanup(now = Date.now()) {
+    db.prepare('DELETE FROM auth_nonces WHERE expires < ?').run(now);
+  }
+};
+
+// --- Key/value settings (e.g. a durable token-signing secret) --------
+const Settings = {
+  get(key) {
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
+    return row ? row.value : null;
+  },
+  set(key, value) {
+    db.prepare(
+      'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+    ).run(key, value);
+    return value;
+  }
+};
+
+module.exports = { db, Watchlist, Holdings, Nonces, Settings };

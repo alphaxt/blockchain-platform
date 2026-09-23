@@ -21,15 +21,35 @@ const crypto = require('crypto');
 const { secp256k1 } = require('@noble/curves/secp256k1');
 const { keccak_256 } = require('@noble/hashes/sha3');
 
-// Server secret for signing session tokens. In production set AUTH_SECRET;
-// otherwise we generate an ephemeral one per process (tokens won't survive
-// a restart, which is fine for a demo).
-const SECRET = process.env.AUTH_SECRET || crypto.randomBytes(32).toString('hex');
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 const NONCE_TTL_MS = 10 * 60 * 1000;      // 10m to complete the sign-in
 
-// address -> { nonce, expires }
-const nonces = new Map();
+// Secret for signing session tokens. Prefer the AUTH_SECRET env var; a
+// durable secret can also be injected via configure() (persisted in the DB
+// so tokens survive restarts). Falls back to an ephemeral per-process value.
+let secret = process.env.AUTH_SECRET || crypto.randomBytes(32).toString('hex');
+
+// Default in-memory nonce store (address -> { nonce, expires }). It can be
+// swapped for a persistent store (e.g. SQLite) via configure(), so sign-in
+// survives restarts and works across multiple server instances.
+const memNonces = new Map();
+let nonceStore = {
+  put(addr, nonce, expires) { memNonces.set(addr, { nonce, expires }); },
+  get(addr) { return memNonces.get(addr) || null; },
+  remove(addr) { memNonces.delete(addr); },
+  cleanup(now) { for (const [k, v] of memNonces) if (v.expires < now) memNonces.delete(k); }
+};
+
+/**
+ * Inject a persistent backend. Called once at startup by the server.
+ * @param {object} [opts]
+ * @param {object} [opts.nonceStore] { put(addr,nonce,expires), get(addr)->{nonce,expires}|null, remove(addr), cleanup(now) }
+ * @param {string} [opts.secret] durable token-signing secret
+ */
+function configure(opts = {}) {
+  if (opts.nonceStore) nonceStore = opts.nonceStore;
+  if (opts.secret) secret = opts.secret;
+}
 
 const ADDR_RE = /^0x[a-fA-F0-9]{40}$/;
 
@@ -60,7 +80,8 @@ function issueNonce(address) {
   if (!isAddress(address)) throw new Error('Invalid address');
   const addr = address.toLowerCase();
   const nonce = crypto.randomBytes(16).toString('hex');
-  nonces.set(addr, { nonce, expires: Date.now() + NONCE_TTL_MS });
+  try { nonceStore.cleanup(Date.now()); } catch (e) { /* optional */ }
+  nonceStore.put(addr, nonce, Date.now() + NONCE_TTL_MS);
   return { nonce, message: loginMessage(nonce) };
 }
 
@@ -95,14 +116,14 @@ function verifySignature(address, signature) {
   if (!isAddress(address)) throw new Error('Invalid address');
   if (typeof signature !== 'string') throw new Error('Missing signature');
   const addr = address.toLowerCase();
-  const record = nonces.get(addr);
+  const record = nonceStore.get(addr);
   if (!record) throw new Error('No nonce issued for this address — request one first');
-  if (Date.now() > record.expires) { nonces.delete(addr); throw new Error('Nonce expired — request a new one'); }
+  if (Date.now() > record.expires) { nonceStore.remove(addr); throw new Error('Nonce expired — request a new one'); }
 
   const recovered = recoverAddress(loginMessage(record.nonce), signature);
   if (recovered !== addr) throw new Error('Signature does not match address');
 
-  nonces.delete(addr); // one-time use
+  nonceStore.remove(addr); // one-time use
   return issueToken(addr);
 }
 
@@ -114,7 +135,7 @@ function b64urlDecode(str) {
   return Buffer.from(str.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
 }
 function sign(payloadB64) {
-  return crypto.createHmac('sha256', SECRET).update(payloadB64).digest('base64')
+  return crypto.createHmac('sha256', secret).update(payloadB64).digest('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
@@ -160,6 +181,7 @@ function authMiddleware(required = false) {
 }
 
 module.exports = {
+  configure,
   issueNonce,
   verifySignature,
   recoverAddress,

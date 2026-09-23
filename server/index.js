@@ -47,6 +47,16 @@ try {
 const { Watchlist, Holdings } = store;
 const auth = require('./auth');
 
+// If SQLite is available, persist auth nonces there and use a durable
+// token-signing secret so sign-in survives restarts and scales across
+// instances. Without SQLite, auth keeps its in-memory defaults.
+if (store.Nonces && store.Settings) {
+  const crypto = require('crypto');
+  let secret = process.env.AUTH_SECRET || store.Settings.get('auth_secret');
+  if (!secret) secret = store.Settings.set('auth_secret', crypto.randomBytes(32).toString('hex'));
+  auth.configure({ nonceStore: store.Nonces, secret });
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const COINGECKO_BASE = 'https://api.coingecko.com/api/v3';
