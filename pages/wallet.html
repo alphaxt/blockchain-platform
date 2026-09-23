@@ -543,20 +543,20 @@
                     </div>
                     
                     <div class="action-grid">
-                        <div class="action-card">
+                        <div class="action-card" data-action="receive" style="cursor:pointer;">
                             <div class="action-icon">
                                 <i class="fas fa-arrow-down"></i>
                             </div>
-                            <h3 class="action-title">Deposit</h3>
-                            <p class="action-desc">Add funds to your wallet</p>
+                            <h3 class="action-title">Receive</h3>
+                            <p class="action-desc">Show your address to receive funds</p>
                         </div>
                         
-                        <div class="action-card">
+                        <div class="action-card" data-action="withdraw" style="cursor:pointer;">
                             <div class="action-icon">
                                 <i class="fas fa-arrow-up"></i>
                             </div>
                             <h3 class="action-title">Withdraw</h3>
-                            <p class="action-desc">Transfer to bank account</p>
+                            <p class="action-desc">Send ETH out to another address</p>
                         </div>
                         
                         <div class="action-card" data-action="swap" style="cursor:pointer;">
@@ -936,6 +936,39 @@
                     window.open(W.explorerTxUrl(hash), '_blank', 'noopener');
                 } catch (e) {
                     if (App) App.toast('Swap failed: ' + (e.code === 4001 ? 'rejected' : e.message), 'error');
+                }
+            });
+
+            // Receive: surface the connected address (copy + explorer link).
+            const receiveCard = document.querySelector('[data-action="receive"]');
+            if (receiveCard) receiveCard.addEventListener('click', async () => {
+                const s = W.getState();
+                if (!s.connected) { if (App) App.toast('Connect your wallet first', 'warning'); return; }
+                let copied = false;
+                try {
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        await navigator.clipboard.writeText(s.account);
+                        copied = true;
+                    }
+                } catch (e) { /* clipboard blocked; still show the address */ }
+                if (App) App.toast('Your address' + (copied ? ' (copied): ' : ': ') + W.shorten(s.account), 'success');
+                window.open(W.explorerAddressUrl(s.account), '_blank', 'noopener');
+            });
+
+            // Withdraw: send ETH out (same on-chain transfer as Send).
+            const withdrawCard = document.querySelector('[data-action="withdraw"]');
+            if (withdrawCard) withdrawCard.addEventListener('click', async () => {
+                if (!W.getState().connected) { if (App) App.toast('Connect your wallet first', 'warning'); return; }
+                const to = prompt('Withdraw to address (0x...):');
+                if (!to) return;
+                const amount = prompt('Amount in ETH:');
+                if (!amount) return;
+                try {
+                    const hash = await W.sendEth(to.trim(), amount.trim());
+                    if (App) App.toast('Withdrawal sent: ' + hash.slice(0, 10) + '…', 'success');
+                    window.open(W.explorerTxUrl(hash), '_blank', 'noopener');
+                } catch (e) {
+                    if (App) App.toast('Withdrawal failed: ' + (e.code === 4001 ? 'rejected' : e.message), 'error');
                 }
             });
 

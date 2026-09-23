@@ -114,6 +114,31 @@
     });
   }
 
+  // Make the generic "Search coins..." bars functional: pressing Enter routes
+  // to the Prices page with the term as ?q=, where the live table filters.
+  // Pages that own their own search (index, prices — id="searchInput") keep it.
+  function pricesHref() {
+    // Resolve the correct relative path whether we're at the site root or in /pages/.
+    return location.pathname.includes('/pages/') ? 'prices.html' : 'pages/prices.html';
+  }
+  function isCoinSearchInput(el) {
+    if (!el || el.tagName !== 'INPUT') return false;
+    if (el.id === 'searchInput') return false; // page-owned functional search
+    const ph = (el.getAttribute('placeholder') || '').toLowerCase();
+    return ph.includes('search coins');
+  }
+  function initGlobalSearch() {
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      const el = e.target;
+      if (!isCoinSearchInput(el)) return;
+      const term = el.value.trim();
+      if (!term) return;
+      e.preventDefault();
+      window.location.href = pricesHref() + '?q=' + encodeURIComponent(term);
+    });
+  }
+
   function initWallet() {
     if (!Wallet) return;
     Wallet.onChange(updateWalletButtons);
@@ -168,6 +193,9 @@
   }
 
   document.addEventListener('DOMContentLoaded', initWallet);
+  // Global search routing is independent of the wallet module, so wire it
+  // separately (works even on pages without the wallet loaded).
+  document.addEventListener('DOMContentLoaded', initGlobalSearch);
 
   global.CryptoHubApp = { toast, setDataBadge, updateWalletButtons, flashPrice, connectWalletConnect };
 })(window);

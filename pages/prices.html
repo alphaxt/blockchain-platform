@@ -995,6 +995,16 @@
             const searchInput = document.getElementById('searchInput');
             if (searchInput) searchInput.addEventListener('input', function() { currentSearch = this.value.toLowerCase().trim(); applyView(); });
 
+            // Accept a ?q= term routed from another page's search bar.
+            try {
+                const q = new URLSearchParams(location.search).get('q');
+                if (q && searchInput) {
+                    searchInput.value = q;
+                    currentSearch = q.toLowerCase().trim();
+                    applyView();
+                }
+            } catch (e) { /* ignore */ }
+
             document.querySelectorAll('.filter-btn').forEach((button) => {
                 button.addEventListener('click', function() {
                     document.querySelectorAll('.filter-btn').forEach((btn) => btn.classList.remove('active'));
