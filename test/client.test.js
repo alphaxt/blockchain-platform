@@ -43,6 +43,7 @@ function loadModule(src, overrides = {}) {
     setTimeout, clearTimeout,
     AbortController,
     TextEncoder,
+    TextDecoder,
     fetch: overrides.fetch || (async () => { throw new Error('network disabled'); }),
     open: () => {},
     requestAnimationFrame: (fn) => setTimeout(fn, 0)
@@ -323,6 +324,47 @@ test('wallet: swapTokenForEth skips approval when allowance is sufficient', asyn
   const sends = provider.calls.filter((c) => c.method === 'eth_sendTransaction');
   assert.strictEqual(sends.length, 1, 'swap only, no approve');
   assert.strictEqual(res.approveTx, undefined);
+});
+
+test('wallet: fromBaseUnits formats amounts by decimals', () => {
+  const { win } = loadModule(WALLET_SRC, { ethereum: recordingProvider() });
+  const W = win.CryptoHubWallet;
+  assert.strictEqual(W.fromBaseUnits(2000000n, 6), '2');
+  assert.strictEqual(W.fromBaseUnits(1500000n, 6), '1.5');
+  assert.strictEqual(W.fromBaseUnits(1234567890123456789n, 18), '1.234567'); // trimmed to 6 places
+  assert.strictEqual(W.fromBaseUnits(0n, 18), '0');
+  assert.strictEqual(W.fromBaseUnits(1000000000000000000n, 18), '1');
+});
+
+// eth_call return encoders for symbol() shapes.
+function u256(n) { return BigInt(n).toString(16).padStart(64, '0'); }
+function utf8Hex(s) { return Array.from(new TextEncoder().encode(s)).map((b) => b.toString(16).padStart(2, '0')).join(''); }
+function dynStringReturn(s) { return '0x' + u256(32) + u256(s.length) + utf8Hex(s).padEnd(64, '0'); }
+function bytes32Return(s) { return '0x' + utf8Hex(s).padEnd(64, '0'); }
+
+test('wallet: tokenSymbol decodes a dynamic string return', async () => {
+  const provider = recordingProvider({ eth_chainId: '0x1', eth_call: dynStringReturn('USDC') });
+  const { win } = loadModule(WALLET_SRC, { ethereum: provider });
+  const W = win.CryptoHubWallet;
+  await W.connect();
+  assert.strictEqual(await W.tokenSymbol('0x' + '11'.repeat(20)), 'USDC');
+});
+
+test('wallet: tokenSymbol decodes a legacy bytes32 return', async () => {
+  const provider = recordingProvider({ eth_chainId: '0x1', eth_call: bytes32Return('MKR') });
+  const { win } = loadModule(WALLET_SRC, { ethereum: provider });
+  const W = win.CryptoHubWallet;
+  await W.connect();
+  assert.strictEqual(await W.tokenSymbol('0x' + '22'.repeat(20)), 'MKR');
+});
+
+test('wallet: tokenSymbol falls back to a shortened address on failure', async () => {
+  const provider = recordingProvider({ eth_chainId: '0x1', eth_call: () => { throw new Error('revert'); } });
+  const { win } = loadModule(WALLET_SRC, { ethereum: provider });
+  const W = win.CryptoHubWallet;
+  await W.connect();
+  const addr = '0x1234567890abcdef1234567890abcdef12345678';
+  assert.strictEqual(await W.tokenSymbol(addr), '0x1234...5678');
 });
 
 test('wallet: explorer URLs resolve per chain', async () => {

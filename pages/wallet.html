@@ -635,12 +635,35 @@
                 try {
                     const slip = Number(elSlip.value);
                     if (d === 'buy') {
-                        // ETH -> token: getSwapQuote returns token base units out.
-                        const out = await W.getSwapQuote(token, amount);
+                        // ETH -> token: quote the user's amount plus a tiny reference
+                        // amount to estimate the marginal (spot) price for price impact.
+                        const [out, dec, sym] = await Promise.all([
+                            W.getSwapQuote(token, amount),
+                            W.tokenDecimals(token),
+                            W.tokenSymbol(token)
+                        ]);
                         lastQuote = out;
                         const minOut = (out * BigInt(Math.round((100 - slip) * 100))) / 10000n;
-                        elQuote.innerHTML = 'Est. output: <b>' + out.toString() + '</b> token base units<br>' +
-                            'Min received (' + slip + '% slippage): <b>' + minOut.toString() + '</b>';
+                        const outStr = W.fromBaseUnits(out, dec);
+                        const minStr = W.fromBaseUnits(minOut, dec);
+
+                        // Price impact: compare this trade's rate to a tiny reference trade's rate.
+                        let impactLine = '';
+                        try {
+                            const refEth = '0.001';
+                            const refOut = await W.getSwapQuote(token, refEth);
+                            // tokens per ETH at the margin vs for this trade
+                            const spotRate = Number(refOut) / Number(refEth);
+                            const tradeRate = Number(out) / Number(amount);
+                            if (spotRate > 0) {
+                                const impact = Math.max(0, (1 - tradeRate / spotRate) * 100);
+                                const cls = impact >= 5 ? 'style="color:var(--danger)"' : '';
+                                impactLine = '<br>Price impact: <b ' + cls + '>' + impact.toFixed(2) + '%</b>';
+                            }
+                        } catch (e) { /* impact is best-effort */ }
+
+                        elQuote.innerHTML = 'Est. output: <b>' + outStr + ' ' + sym + '</b><br>' +
+                            'Min received (' + slip + '%): <b>' + minStr + ' ' + sym + '</b>' + impactLine;
                     } else {
                         // sell (token -> ETH): the exact quote (and any approval) is
                         // computed at execution time inside swapTokenForEth.

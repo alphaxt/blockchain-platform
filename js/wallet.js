@@ -460,7 +460,8 @@
     approve:   '095ea7b3', // approve(address spender, uint256 amount)
     allowance: 'dd62ed3e', // allowance(address owner, address spender)
     balanceOf: '70a08231', // balanceOf(address)
-    decimals:  '313ce567'  // decimals()
+    decimals:  '313ce567', // decimals()
+    symbol:    '95d89b41'  // symbol()
   };
   const MAX_UINT256 = (2n ** 256n) - 1n;
 
@@ -572,6 +573,67 @@
       const d = Number(BigInt(hex));
       return Number.isFinite(d) && d >= 0 && d <= 36 ? d : 18;
     } catch (e) { return 18; }
+  }
+
+  // Decode a hex byte string to UTF-8 without Node's Buffer (browser-safe),
+  // dropping trailing NUL padding.
+  function hexToUtf8(hexNo0x) {
+    const bytes = [];
+    for (let i = 0; i + 1 < hexNo0x.length; i += 2) {
+      const b = parseInt(hexNo0x.substr(i, 2), 16);
+      if (b === 0) continue; // skip padding / NULs
+      bytes.push(b);
+    }
+    try {
+      return new TextDecoder('utf-8').decode(new Uint8Array(bytes)).trim();
+    } catch (e) {
+      // Fallback: treat as ASCII.
+      return bytes.map((b) => String.fromCharCode(b)).join('').trim();
+    }
+  }
+
+  /**
+   * Read an ERC-20's symbol. Handles both the modern dynamic `string` return
+   * (offset + length + UTF-8 bytes) and legacy `bytes32` tokens (e.g. MKR).
+   * Falls back to a shortened address if the call fails.
+   */
+  async function tokenSymbol(token) {
+    try {
+      const hex = await provider().request({
+        method: 'eth_call',
+        params: [{ to: token, data: '0x' + ERC20_SELECTORS.symbol }, 'latest']
+      });
+      const body = hex.replace(/^0x/, '');
+      if (body.length === 0) return shorten(token);
+      // Dynamic string: first 32 bytes = offset (typically 0x20), next 32 =
+      // length, then the UTF-8 bytes. Detect it by a plausible 0x20 offset.
+      const offset = body.length >= 64 ? Number(BigInt('0x' + body.slice(0, 64))) : -1;
+      if (offset === 32 && body.length >= 128) {
+        const len = Number(BigInt('0x' + body.slice(64, 128)));
+        const s = hexToUtf8(body.slice(128, 128 + len * 2));
+        return s || shorten(token);
+      }
+      // Legacy bytes32: strip trailing zero padding, decode as UTF-8.
+      const s = hexToUtf8(body.slice(0, 64));
+      return s || shorten(token);
+    } catch (e) { return shorten(token); }
+  }
+
+  /**
+   * Format a base-unit amount (bigint/string) as a human-readable decimal
+   * string given the token's decimals, trimmed to at most `maxFrac` places.
+   * @param {bigint|string|number} amountBaseUnits
+   * @param {number} decimals
+   * @param {number} [maxFrac] max fraction digits to show (default 6)
+   */
+  function fromBaseUnits(amountBaseUnits, decimals, maxFrac = 6) {
+    const v = BigInt(amountBaseUnits);
+    const base = 10n ** BigInt(decimals);
+    const whole = v / base;
+    let frac = (v % base).toString().padStart(decimals, '0');
+    // Trim to maxFrac significant fractional places, then drop trailing zeros.
+    frac = frac.slice(0, maxFrac).replace(/0+$/, '');
+    return frac ? `${whole}.${frac}` : `${whole}`;
   }
 
   /** Read the router's current allowance for the connected account's token. */
@@ -761,6 +823,8 @@
     approveToken,
     tokenAllowance,
     tokenDecimals,
+    tokenSymbol,
+    fromBaseUnits,
     getSwapQuote,
     dexSwapSupported,
     explorerAddressUrl,
