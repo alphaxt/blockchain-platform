@@ -41,6 +41,7 @@ You can run it two ways:
 - **On-chain swaps** — two real, key-less swap paths through the connected provider:
   - Wrap / unwrap native ETH ↔ WETH via the canonical WETH9 contract (`deposit()` / `withdraw(uint256)`), on 7 chains
   - Buy any ERC-20 with ETH via a Uniswap V2-style router (`getAmountsOut` quote → `swapExactETHForTokens` with a 1% slippage floor and a 20-minute deadline), on Ethereum, Sepolia, Polygon, BSC, and Arbitrum
+  - Sell an ERC-20 back for ETH — checks the router allowance and sends an `approve` first when needed, then `swapExactTokensForETH`
 - **Sign messages** with `personal_sign`
 - **Block-explorer links** for the connected address and sent transactions, resolved per chain (Etherscan, Polygonscan, Arbiscan, and more)
 
@@ -55,7 +56,7 @@ You can run it two ways:
 - `GET /api/markets?ids=bitcoin,ethereum` — cached live market data
 - `GET /api/global` — cached global market stats
 - `GET /api/coins/:id/chart?days=7` — historical prices
-- `GET /api/auth/nonce` · `POST /api/auth/verify` · `GET /api/auth/me` — wallet sign-in
+- `GET /api/auth/nonce` · `POST /api/auth/verify` · `GET /api/auth/me` · `POST /api/auth/refresh` — wallet sign-in and session refresh
 - `GET|POST|DELETE /api/watchlist` — per-user watchlist persisted in SQLite
 - `GET|POST|DELETE /api/portfolio` — per-user portfolio holdings persisted in SQLite, enriched with live prices and a computed USD total
 
@@ -165,6 +166,7 @@ npm test
 | GET    | `/api/auth/nonce?address=…`  | Issue a nonce + message to sign   |
 | POST   | `/api/auth/verify`           | `{ address, signature }` → session token |
 | GET    | `/api/auth/me`               | Who the `Bearer` token authenticates as |
+| POST   | `/api/auth/refresh`          | Exchange a valid `Bearer` token for a fresh one |
 | GET    | `/api/watchlist`             | Current watchlist (per-user)      |
 | POST   | `/api/watchlist`             | Add `{ "id": "bitcoin" }`         |
 | DELETE | `/api/watchlist/:id`         | Remove a coin                     |
@@ -241,9 +243,8 @@ configure it — everything else keeps working.
 
 ## 🎯 Future Enhancements
 
-- Token → ETH and token → token swaps (the ETH → token direction is supported today; selling a token first needs an ERC-20 `approve` step)
-- Multi-device sessions and token refresh for wallet sign-in
-- Move the remaining page-specific inline CSS into per-feature stylesheets (the shared "chrome" is already centralized in `css/shared.css`)
+- Token → token swaps (routing through an intermediate pair); ETH ↔ token is supported in both directions today
+- Price-impact display and configurable slippage in the swap UI
 
 ---
 

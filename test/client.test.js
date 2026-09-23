@@ -271,6 +271,60 @@ test('wallet: swapEthForToken rejects a bad token address', async () => {
   await assert.rejects(() => W.swapEthForToken('nope', '1'), /Invalid token address/);
 });
 
+// Provider whose eth_call answers per selector; approve/allowance-aware.
+function dexProvider(allowanceBase) {
+  const u = (n) => BigInt(n).toString(16).padStart(64, '0');
+  const calls = [];
+  return {
+    calls, on() {},
+    async request({ method, params }) {
+      calls.push({ method, params });
+      if (method === 'eth_chainId') return '0x1';
+      if (method === 'eth_requestAccounts') return ['0xaaaA0000000000000000000000000000000000aa'];
+      if (method === 'eth_getBalance') return '0xde0b6b3a7640000';
+      if (method === 'eth_call') {
+        const d = params[0].data;
+        if (d.startsWith('0x313ce567')) return '0x' + u(6);   // decimals = 6
+        if (d.startsWith('0xdd62ed3e')) return '0x' + u(allowanceBase); // allowance
+        if (d.startsWith('0xd06ca61f')) return '0x' + u(2) + u(2) + u(1) + u('500000000000000000'); // 0.5 ETH out
+        return '0x' + u(0);
+      }
+      if (method === 'eth_sendTransaction') return '0x' + 'ee'.repeat(32);
+      return null;
+    }
+  };
+}
+
+test('wallet: swapTokenForEth approves then swaps when allowance is insufficient', async () => {
+  const provider = dexProvider(0);
+  const { win } = loadModule(WALLET_SRC, { ethereum: provider });
+  const W = win.CryptoHubWallet;
+  await W.connect();
+  const USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
+  const res = await W.swapTokenForEth(USDC, '100', 1); // 100 USDC (6 decimals)
+  const sends = provider.calls.filter((c) => c.method === 'eth_sendTransaction');
+  assert.strictEqual(sends.length, 2, 'approve + swap');
+  assert.strictEqual(sends[0].params[0].to, USDC);
+  assert.ok(sends[0].params[0].data.startsWith('0x095ea7b3'), 'approve()');
+  assert.ok(sends[1].params[0].data.startsWith('0x18cbafe5'), 'swapExactTokensForETH()');
+  const body = sends[1].params[0].data.slice(10);
+  assert.strictEqual(BigInt('0x' + body.slice(0, 64)), 100000000n, '100 USDC in base units');
+  assert.strictEqual(BigInt('0x' + body.slice(64, 128)), 495000000000000000n, '0.5 ETH minus 1%');
+  assert.strictEqual(BigInt('0x' + body.slice(128, 192)), 160n, 'path offset 0xa0');
+  assert.ok(res.approveTx && res.swapTx);
+}, { timeout: 15000 });
+
+test('wallet: swapTokenForEth skips approval when allowance is sufficient', async () => {
+  const provider = dexProvider('999999999999999999999999999999');
+  const { win } = loadModule(WALLET_SRC, { ethereum: provider });
+  const W = win.CryptoHubWallet;
+  await W.connect();
+  const res = await W.swapTokenForEth('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '50', 1);
+  const sends = provider.calls.filter((c) => c.method === 'eth_sendTransaction');
+  assert.strictEqual(sends.length, 1, 'swap only, no approve');
+  assert.strictEqual(res.approveTx, undefined);
+});
+
 test('wallet: explorer URLs resolve per chain', async () => {
   const provider = recordingProvider({ eth_chainId: '0x89' });
   const { win } = loadModule(WALLET_SRC, { ethereum: provider });

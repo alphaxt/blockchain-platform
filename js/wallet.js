@@ -154,6 +154,8 @@
         state.account = accounts[0];
         await syncChain();
         await refreshBalance();
+        // Slide the backend session forward if we're still signed in.
+        refreshSession().catch(() => {});
         emit();
       }
     } catch (e) { /* ignore */ }
@@ -263,6 +265,31 @@
   function logout() {
     localStorage.removeItem(TOKEN_KEY);
     emit();
+  }
+
+  /**
+   * Exchange the stored token for a fresh one (sliding expiry). Keeps a
+   * device signed in without re-signing. Silently no-ops if there's no
+   * token or the backend rejects it (an expired token is simply cleared).
+   * @returns {Promise<boolean>} true if the session was refreshed
+   */
+  async function refreshSession() {
+    if (!location.protocol.startsWith('http')) return false;
+    const token = getToken();
+    if (!token) return false;
+    try {
+      const res = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.token) { localStorage.setItem(TOKEN_KEY, data.token); return true; }
+      } else if (res.status === 401) {
+        localStorage.removeItem(TOKEN_KEY); // stale token; drop it
+      }
+    } catch (e) { /* offline; keep the existing token */ }
+    return false;
   }
 
   // Block explorer base per chain, for building tx / address links.
@@ -426,8 +453,16 @@
   };
   const DEX_SELECTORS = {
     swapExactETHForTokens: '7ff36ab5', // (uint256 amountOutMin, address[] path, address to, uint256 deadline)
+    swapExactTokensForETH: '18cbafe5', // (uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline)
     getAmountsOut:         'd06ca61f'  // (uint256 amountIn, address[] path)
   };
+  const ERC20_SELECTORS = {
+    approve:   '095ea7b3', // approve(address spender, uint256 amount)
+    allowance: 'dd62ed3e', // allowance(address owner, address spender)
+    balanceOf: '70a08231', // balanceOf(address)
+    decimals:  '313ce567'  // decimals()
+  };
+  const MAX_UINT256 = (2n ** 256n) - 1n;
 
   function dexRouter() {
     const addr = DEX_ROUTERS[state.chainId];
@@ -461,11 +496,20 @@
    */
   async function getSwapQuote(tokenOut, amountEth) {
     if (!/^0x[a-fA-F0-9]{40}$/.test(tokenOut)) throw new Error('Invalid token address.');
-    const path = [wethAddress(), tokenOut];
     const amountInWei = BigInt(ethToWeiHex(amountEth));
+    return quoteAmountsOut(amountInWei, [wethAddress(), tokenOut]);
+  }
+
+  /**
+   * Low-level router.getAmountsOut over an explicit path.
+   * @param {bigint} amountIn input in base units
+   * @param {string[]} path token address path
+   * @returns {Promise<bigint>} output amount (last element) in base units
+   */
+  async function quoteAmountsOut(amountIn, path) {
     // getAmountsOut(amountIn, path): head = [amountIn][offset=0x40], then path.
     const data = '0x' + DEX_SELECTORS.getAmountsOut +
-      uintHex32(amountInWei) + uintHex32(64n) + encodeAddressArray(path);
+      uintHex32(amountIn) + uintHex32(64n) + encodeAddressArray(path);
     const hex = await provider().request({
       method: 'eth_call',
       params: [{ to: dexRouter(), data }, 'latest']
@@ -514,6 +558,103 @@
     });
     setTimeout(() => refreshBalance().then(emit), 3000);
     return txHash;
+  }
+
+  // --- Token -> ETH (needs an ERC-20 approval first) -------------------
+
+  /** Read an ERC-20's decimals (defaults to 18 on failure). */
+  async function tokenDecimals(token) {
+    try {
+      const hex = await provider().request({
+        method: 'eth_call',
+        params: [{ to: token, data: '0x' + ERC20_SELECTORS.decimals }, 'latest']
+      });
+      const d = Number(BigInt(hex));
+      return Number.isFinite(d) && d >= 0 && d <= 36 ? d : 18;
+    } catch (e) { return 18; }
+  }
+
+  /** Read the router's current allowance for the connected account's token. */
+  async function tokenAllowance(token) {
+    const data = '0x' + ERC20_SELECTORS.allowance + addrHex32(state.account) + addrHex32(dexRouter());
+    const hex = await provider().request({
+      method: 'eth_call',
+      params: [{ to: token, data }, 'latest']
+    });
+    return BigInt(hex);
+  }
+
+  /** Convert a decimal token amount to base units given its decimals. */
+  function toBaseUnits(amount, decimals) {
+    const [whole, frac = ''] = String(amount).split('.');
+    const fracPadded = (frac + '0'.repeat(decimals)).slice(0, decimals);
+    return BigInt(whole || '0') * (10n ** BigInt(decimals)) + BigInt(fracPadded || '0');
+  }
+
+  /**
+   * Approve the router to spend `amountBaseUnits` of `token` (unlimited if omitted).
+   * @returns {Promise<string>} tx hash
+   */
+  async function approveToken(token, amountBaseUnits) {
+    if (!hasProvider()) throw new Error('No Web3 wallet found.');
+    if (!state.account) throw new Error('Connect a wallet first.');
+    const amt = amountBaseUnits == null ? MAX_UINT256 : BigInt(amountBaseUnits);
+    const data = '0x' + ERC20_SELECTORS.approve + addrHex32(dexRouter()) + uintHex32(amt);
+    return provider().request({
+      method: 'eth_sendTransaction',
+      params: [{ from: state.account, to: token, data }]
+    });
+  }
+
+  /**
+   * Swap an ERC-20 token for native ETH via the router. Automatically sends
+   * an approval first if the router's allowance is insufficient.
+   * @param {string} tokenIn ERC-20 address to sell
+   * @param {string|number} amount human amount of the token
+   * @param {number} [slippagePct] slippage tolerance (default 1%)
+   * @returns {Promise<{approveTx?:string, swapTx:string}>}
+   */
+  async function swapTokenForEth(tokenIn, amount, slippagePct = 1) {
+    if (!hasProvider()) throw new Error('No Web3 wallet found.');
+    if (!state.account) throw new Error('Connect a wallet first.');
+    if (!/^0x[a-fA-F0-9]{40}$/.test(tokenIn)) throw new Error('Invalid token address.');
+    if (Number(amount) <= 0 || isNaN(Number(amount))) throw new Error('Enter a valid amount.');
+
+    const decimals = await tokenDecimals(tokenIn);
+    const amountIn = toBaseUnits(amount, decimals);
+    const path = [tokenIn, wethAddress()];
+
+    // Approve the router if the current allowance is too low.
+    let approveTx;
+    const allowance = await tokenAllowance(tokenIn);
+    if (allowance < amountIn) {
+      approveTx = await approveToken(tokenIn, MAX_UINT256);
+      // Give the approval a moment to be included before the swap.
+      await new Promise((r) => setTimeout(r, 4000));
+    }
+
+    // Quote ETH out and apply slippage.
+    const quoted = await quoteAmountsOut(amountIn, path);
+    const bps = BigInt(Math.round((100 - slippagePct) * 100));
+    const amountOutMin = quoted * bps / 10000n;
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + 20 * 60);
+
+    // swapExactTokensForETH(amountIn, amountOutMin, path, to, deadline): 5 head
+    // slots -> path is dynamic at offset 0xa0 (160), then path data.
+    const data = '0x' + DEX_SELECTORS.swapExactTokensForETH +
+      uintHex32(amountIn) +
+      uintHex32(amountOutMin) +
+      uintHex32(160n) +
+      addrHex32(state.account) +
+      uintHex32(deadline) +
+      encodeAddressArray(path);
+
+    const swapTx = await provider().request({
+      method: 'eth_sendTransaction',
+      params: [{ from: state.account, to: dexRouter(), data }]
+    });
+    setTimeout(() => refreshBalance().then(emit), 3000);
+    return { approveTx, swapTx };
   }
 
   // --- WalletConnect (mobile wallets via QR / deep link) -------------
@@ -605,6 +746,7 @@
     signMessage,
     login,
     logout,
+    refreshSession,
     isLoggedIn,
     getToken,
     getTxCount,
@@ -615,6 +757,10 @@
     swapSupported,
     wrappedSymbol,
     swapEthForToken,
+    swapTokenForEth,
+    approveToken,
+    tokenAllowance,
+    tokenDecimals,
     getSwapQuote,
     dexSwapSupported,
     explorerAddressUrl,
