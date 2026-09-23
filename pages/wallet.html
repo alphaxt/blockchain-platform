@@ -242,6 +242,49 @@
         </div>
     </div>
 
+    <!-- Swap Panel Modal -->
+    <div id="swapModal" role="dialog" aria-modal="true" aria-labelledby="swapModalTitle"
+         style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:3000;justify-content:center;align-items:center;padding:1rem;">
+        <div style="background:var(--dark);border:1px solid rgba(108,92,231,0.35);border-radius:18px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,0.5);">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:1.2rem 1.5rem;border-bottom:1px solid rgba(92,106,146,0.2);">
+                <h2 id="swapModalTitle" class="section-title" style="font-size:1.4rem;margin:0;">Swap</h2>
+                <button id="swapClose" aria-label="Close" style="background:transparent;border:none;color:var(--secondary);font-size:1.5rem;cursor:pointer;line-height:1;">&times;</button>
+            </div>
+            <div style="padding:1.5rem;display:flex;flex-direction:column;gap:1rem;">
+                <label style="display:flex;flex-direction:column;gap:0.4rem;font-size:0.9rem;color:var(--secondary);">
+                    Direction
+                    <select id="swapDirection" style="background:rgba(255,255,255,0.08);color:var(--light);border:1px solid rgba(108,92,231,0.3);border-radius:10px;padding:0.7rem;font-size:1rem;">
+                        <option value="wrap">Wrap — ETH → WETH</option>
+                        <option value="unwrap">Unwrap — WETH → ETH</option>
+                        <option value="buy">Buy — ETH → ERC-20 token</option>
+                        <option value="sell">Sell — ERC-20 token → ETH</option>
+                    </select>
+                </label>
+                <label id="swapTokenRow" style="display:none;flex-direction:column;gap:0.4rem;font-size:0.9rem;color:var(--secondary);">
+                    Token address
+                    <input id="swapToken" type="text" placeholder="0x..." autocomplete="off"
+                           style="background:rgba(255,255,255,0.08);color:var(--light);border:1px solid rgba(108,92,231,0.3);border-radius:10px;padding:0.7rem;font-size:1rem;">
+                </label>
+                <label style="display:flex;flex-direction:column;gap:0.4rem;font-size:0.9rem;color:var(--secondary);">
+                    <span id="swapAmountLabel">Amount (ETH)</span>
+                    <input id="swapAmount" type="number" min="0" step="any" placeholder="0.0"
+                           style="background:rgba(255,255,255,0.08);color:var(--light);border:1px solid rgba(108,92,231,0.3);border-radius:10px;padding:0.7rem;font-size:1rem;">
+                </label>
+                <label id="swapSlippageRow" style="display:none;flex-direction:column;gap:0.4rem;font-size:0.9rem;color:var(--secondary);">
+                    Max slippage
+                    <select id="swapSlippage" style="background:rgba(255,255,255,0.08);color:var(--light);border:1px solid rgba(108,92,231,0.3);border-radius:10px;padding:0.7rem;font-size:1rem;">
+                        <option value="0.5">0.5%</option>
+                        <option value="1" selected>1%</option>
+                        <option value="2">2%</option>
+                        <option value="5">5%</option>
+                    </select>
+                </label>
+                <div id="swapQuote" style="min-height:1.4rem;font-size:0.9rem;color:var(--accent);"></div>
+                <button id="swapExecute" class="btn btn-primary" style="width:100%;justify-content:center;">Review swap</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Footer -->
     <footer class="footer">
         <div class="footer-grid">
@@ -516,65 +559,137 @@
             // On-chain swap flow: wrap/unwrap native ETH <-> WETH via the
             // canonical WETH9 contract (real on-chain tx, no API key needed).
             const swapCard = document.querySelector('[data-action="swap"]');
-            if (swapCard) swapCard.addEventListener('click', async () => {
+            if (swapCard) swapCard.addEventListener('click', () => openSwapPanel());
+
+            // ---- In-page swap panel --------------------------------
+            const modal = document.getElementById('swapModal');
+            const elDir = document.getElementById('swapDirection');
+            const elTokenRow = document.getElementById('swapTokenRow');
+            const elToken = document.getElementById('swapToken');
+            const elAmount = document.getElementById('swapAmount');
+            const elAmountLabel = document.getElementById('swapAmountLabel');
+            const elSlipRow = document.getElementById('swapSlippageRow');
+            const elSlip = document.getElementById('swapSlippage');
+            const elQuote = document.getElementById('swapQuote');
+            const elExec = document.getElementById('swapExecute');
+            let quoteTimer = null;
+            let lastQuote = null; // bigint expected output (base units) for DEX directions
+
+            function closeSwap() { if (modal) modal.style.display = 'none'; }
+
+            function openSwapPanel() {
                 const s = W.getState();
                 if (!s.connected) { if (App) App.toast('Connect your wallet first', 'warning'); return; }
-                const sym = W.wrappedSymbol();
                 const canWrap = W.swapSupported();
                 const canBuy = W.dexSwapSupported();
                 if (!canWrap && !canBuy) { if (App) App.toast('Swaps are not supported on ' + (s.chainName || 'this network'), 'warning'); return; }
-                const options = [canWrap ? '"wrap" (ETH → ' + sym + ')' : null,
-                                 canWrap ? '"unwrap" (' + sym + ' → ETH)' : null,
-                                 canBuy ? '"buy" (ETH → any ERC-20 token)' : null,
-                                 canBuy ? '"sell" (ERC-20 token → ETH)' : null].filter(Boolean).join('\n');
-                const dir = prompt('Swap type — type one of:\n' + options, canBuy ? 'buy' : 'wrap');
-                if (!dir) return;
-                const d = dir.trim().toLowerCase();
+                // Enable/disable options based on chain support.
+                Array.from(elDir.options).forEach((o) => {
+                    const isDex = (o.value === 'buy' || o.value === 'sell');
+                    o.disabled = isDex ? !canBuy : !canWrap;
+                });
+                elDir.value = canWrap ? 'wrap' : 'buy';
+                syncSwapForm();
+                elQuote.textContent = '';
+                elAmount.value = '';
+                elToken.value = '';
+                modal.style.display = 'flex';
+                setTimeout(() => elAmount.focus(), 50);
+            }
 
-                if (d === 'wrap' || d === 'unwrap') {
-                    const amount = prompt(`Amount to ${d} (${d === 'wrap' ? 'ETH' : sym}):`);
-                    if (!amount) return;
-                    try {
-                        const hash = await W.swap(d, amount.trim());
-                        if (App) App.toast(`${d === 'wrap' ? 'Wrap' : 'Unwrap'} sent: ` + hash.slice(0, 10) + '…', 'success');
-                        window.open(W.explorerTxUrl(hash), '_blank', 'noopener');
-                    } catch (e) {
-                        if (App) App.toast('Swap failed: ' + (e.code === 4001 ? 'rejected' : e.message), 'error');
+            // Adjust visible fields + labels for the chosen direction.
+            function syncSwapForm() {
+                const d = elDir.value;
+                const sym = W.wrappedSymbol();
+                const isDex = (d === 'buy' || d === 'sell');
+                elTokenRow.style.display = isDex ? 'flex' : 'none';
+                elSlipRow.style.display = isDex ? 'flex' : 'none';
+                const labels = {
+                    wrap: 'Amount (ETH)', unwrap: 'Amount (' + sym + ')',
+                    buy: 'Amount (ETH to spend)', sell: 'Amount (tokens to sell)'
+                };
+                elAmountLabel.textContent = labels[d];
+                elExec.textContent = isDex ? 'Review swap' : (d === 'wrap' ? 'Wrap' : 'Unwrap');
+                lastQuote = null;
+                elQuote.textContent = '';
+                scheduleQuote();
+            }
+
+            // Debounced live quote for the DEX directions.
+            function scheduleQuote() {
+                if (quoteTimer) clearTimeout(quoteTimer);
+                quoteTimer = setTimeout(updateQuote, 400);
+            }
+
+            async function updateQuote() {
+                const d = elDir.value;
+                const amount = elAmount.value.trim();
+                const token = elToken.value.trim();
+                lastQuote = null;
+                if (d !== 'buy' && d !== 'sell') { elQuote.textContent = ''; return; }
+                if (!token || !/^0x[a-fA-F0-9]{40}$/.test(token) || !amount || Number(amount) <= 0) {
+                    elQuote.textContent = 'Enter a token address and amount for a quote.';
+                    return;
+                }
+                elQuote.textContent = 'Fetching quote…';
+                try {
+                    const slip = Number(elSlip.value);
+                    if (d === 'buy') {
+                        // ETH -> token: getSwapQuote returns token base units out.
+                        const out = await W.getSwapQuote(token, amount);
+                        lastQuote = out;
+                        const minOut = (out * BigInt(Math.round((100 - slip) * 100))) / 10000n;
+                        elQuote.innerHTML = 'Est. output: <b>' + out.toString() + '</b> token base units<br>' +
+                            'Min received (' + slip + '% slippage): <b>' + minOut.toString() + '</b>';
+                    } else {
+                        // sell (token -> ETH): the exact quote (and any approval) is
+                        // computed at execution time inside swapTokenForEth.
+                        elQuote.textContent = 'The ETH quote and any needed approval are confirmed on execute.';
                     }
-                } else if (d === 'buy') {
-                    if (!canBuy) { if (App) App.toast('Token swaps not supported on this network', 'warning'); return; }
-                    const token = prompt('ERC-20 token address to buy (0x...):');
-                    if (!token) return;
-                    const amount = prompt('Amount of ETH to spend:');
-                    if (!amount) return;
-                    try {
-                        // Show a live quote and confirm before sending.
-                        const out = await W.getSwapQuote(token.trim(), amount.trim());
-                        const ok = confirm(`Quote: ~${out.toString()} token base units for ${amount} ETH.\n\nProceed with the swap (1% max slippage)?`);
-                        if (!ok) return;
-                        const hash = await W.swapEthForToken(token.trim(), amount.trim(), 1);
+                } catch (e) {
+                    elQuote.textContent = 'No quote available (check the token address / liquidity).';
+                }
+            }
+
+            if (elDir) elDir.addEventListener('change', syncSwapForm);
+            if (elToken) elToken.addEventListener('input', scheduleQuote);
+            if (elAmount) elAmount.addEventListener('input', scheduleQuote);
+            if (elSlip) elSlip.addEventListener('change', updateQuote);
+            document.getElementById('swapClose').addEventListener('click', closeSwap);
+            modal.addEventListener('click', (e) => { if (e.target === modal) closeSwap(); });
+
+            if (elExec) elExec.addEventListener('click', async () => {
+                const d = elDir.value;
+                const amount = elAmount.value.trim();
+                const token = elToken.value.trim();
+                const slip = Number(elSlip.value) || 1;
+                if (!amount || Number(amount) <= 0) { if (App) App.toast('Enter a valid amount', 'warning'); return; }
+                elExec.disabled = true;
+                try {
+                    if (d === 'wrap' || d === 'unwrap') {
+                        const hash = await W.swap(d, amount);
+                        if (App) App.toast((d === 'wrap' ? 'Wrap' : 'Unwrap') + ' sent: ' + hash.slice(0, 10) + '…', 'success');
+                        window.open(W.explorerTxUrl(hash), '_blank', 'noopener');
+                        closeSwap();
+                    } else if (d === 'buy') {
+                        if (!/^0x[a-fA-F0-9]{40}$/.test(token)) { if (App) App.toast('Enter a valid token address', 'warning'); return; }
+                        const hash = await W.swapEthForToken(token, amount, slip);
                         if (App) App.toast('Swap sent: ' + hash.slice(0, 10) + '…', 'success');
                         window.open(W.explorerTxUrl(hash), '_blank', 'noopener');
-                    } catch (e) {
-                        if (App) App.toast('Swap failed: ' + (e.code === 4001 ? 'rejected' : e.message), 'error');
-                    }
-                } else if (d === 'sell') {
-                    if (!canBuy) { if (App) App.toast('Token swaps not supported on this network', 'warning'); return; }
-                    const token = prompt('ERC-20 token address to sell (0x...):');
-                    if (!token) return;
-                    const amount = prompt('Amount of the token to sell:');
-                    if (!amount) return;
-                    try {
-                        if (App) App.toast('Selling ' + amount + ' tokens — you may be asked to approve first, then swap.', 'info');
-                        const res = await W.swapTokenForEth(token.trim(), amount.trim(), 1);
+                        closeSwap();
+                    } else if (d === 'sell') {
+                        if (!/^0x[a-fA-F0-9]{40}$/.test(token)) { if (App) App.toast('Enter a valid token address', 'warning'); return; }
+                        if (App) App.toast('You may be asked to approve first, then swap.', 'info');
+                        const res = await W.swapTokenForEth(token, amount, slip);
                         if (res.approveTx && App) App.toast('Approval sent: ' + res.approveTx.slice(0, 10) + '…', 'info');
                         if (App) App.toast('Swap sent: ' + res.swapTx.slice(0, 10) + '…', 'success');
                         window.open(W.explorerTxUrl(res.swapTx), '_blank', 'noopener');
-                    } catch (e) {
-                        if (App) App.toast('Swap failed: ' + (e.code === 4001 ? 'rejected' : e.message), 'error');
+                        closeSwap();
                     }
-                } else {
-                    if (App) App.toast('Type "wrap", "unwrap", "buy", or "sell".', 'error');
+                } catch (e) {
+                    if (App) App.toast('Swap failed: ' + (e.code === 4001 ? 'rejected' : e.message), 'error');
+                } finally {
+                    elExec.disabled = false;
                 }
             });
 

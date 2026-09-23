@@ -42,6 +42,7 @@ You can run it two ways:
   - Wrap / unwrap native ETH ↔ WETH via the canonical WETH9 contract (`deposit()` / `withdraw(uint256)`), on 7 chains
   - Buy any ERC-20 with ETH via a Uniswap V2-style router (`getAmountsOut` quote → `swapExactETHForTokens` with a 1% slippage floor and a 20-minute deadline), on Ethereum, Sepolia, Polygon, BSC, and Arbitrum
   - Sell an ERC-20 back for ETH — checks the router allowance and sends an `approve` first when needed, then `swapExactTokensForETH`
+  - An in-page **swap panel** (on the Wallet page) drives all of the above: pick a direction, enter a token + amount, choose slippage, and see a live quote with the minimum received before executing
 - **Sign messages** with `personal_sign`
 - **Block-explorer links** for the connected address and sent transactions, resolved per chain (Etherscan, Polygonscan, Arbiscan, and more)
 
@@ -154,6 +155,9 @@ Two suites run under the built-in Node test runner:
 npm test
 ```
 
+Both suites run automatically on every push and pull request via GitHub Actions
+(`.github/workflows/ci.yml`) on Node 18 and 20.
+
 ---
 
 ## 🔌 API Reference
@@ -245,7 +249,7 @@ configure it — everything else keeps working.
 ## 🎯 Future Enhancements
 
 - Token → token swaps (routing through an intermediate pair); ETH ↔ token is supported in both directions today
-- Price-impact display and configurable slippage in the swap UI
+- Price-impact percentage in the swap panel (live quote and configurable slippage are in place)
 
 Each page now loads shared chrome from `css/shared.css` plus its own `css/<page>.css`;
 only page-specific `:root` token overrides remain inline in the HTML.
