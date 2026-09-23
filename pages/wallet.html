@@ -564,7 +564,7 @@
                                 <i class="fas fa-exchange-alt"></i>
                             </div>
                             <h3 class="action-title">Swap</h3>
-                            <p class="action-desc">Wrap / unwrap ETH &harr; WETH</p>
+                            <p class="action-desc">Wrap/unwrap or buy tokens with ETH</p>
                         </div>
                         
                         <div class="action-card" data-action="send" style="cursor:pointer;">
@@ -922,20 +922,46 @@
             if (swapCard) swapCard.addEventListener('click', async () => {
                 const s = W.getState();
                 if (!s.connected) { if (App) App.toast('Connect your wallet first', 'warning'); return; }
-                if (!W.swapSupported()) { if (App) App.toast('Swaps are not supported on ' + (s.chainName || 'this network'), 'warning'); return; }
                 const sym = W.wrappedSymbol();
-                const dir = prompt(`Swap direction — type "wrap" (ETH → ${sym}) or "unwrap" (${sym} → ETH):`, 'wrap');
+                const canWrap = W.swapSupported();
+                const canBuy = W.dexSwapSupported();
+                if (!canWrap && !canBuy) { if (App) App.toast('Swaps are not supported on ' + (s.chainName || 'this network'), 'warning'); return; }
+                const options = [canWrap ? '"wrap" (ETH → ' + sym + ')' : null,
+                                 canWrap ? '"unwrap" (' + sym + ' → ETH)' : null,
+                                 canBuy ? '"buy" (ETH → any ERC-20 token)' : null].filter(Boolean).join('\n');
+                const dir = prompt('Swap type — type one of:\n' + options, canBuy ? 'buy' : 'wrap');
                 if (!dir) return;
                 const d = dir.trim().toLowerCase();
-                if (d !== 'wrap' && d !== 'unwrap') { if (App) App.toast('Type "wrap" or "unwrap".', 'error'); return; }
-                const amount = prompt(`Amount to ${d} (${d === 'wrap' ? 'ETH' : sym}):`);
-                if (!amount) return;
-                try {
-                    const hash = await W.swap(d, amount.trim());
-                    if (App) App.toast(`${d === 'wrap' ? 'Wrap' : 'Unwrap'} sent: ` + hash.slice(0, 10) + '…', 'success');
-                    window.open(W.explorerTxUrl(hash), '_blank', 'noopener');
-                } catch (e) {
-                    if (App) App.toast('Swap failed: ' + (e.code === 4001 ? 'rejected' : e.message), 'error');
+
+                if (d === 'wrap' || d === 'unwrap') {
+                    const amount = prompt(`Amount to ${d} (${d === 'wrap' ? 'ETH' : sym}):`);
+                    if (!amount) return;
+                    try {
+                        const hash = await W.swap(d, amount.trim());
+                        if (App) App.toast(`${d === 'wrap' ? 'Wrap' : 'Unwrap'} sent: ` + hash.slice(0, 10) + '…', 'success');
+                        window.open(W.explorerTxUrl(hash), '_blank', 'noopener');
+                    } catch (e) {
+                        if (App) App.toast('Swap failed: ' + (e.code === 4001 ? 'rejected' : e.message), 'error');
+                    }
+                } else if (d === 'buy') {
+                    if (!canBuy) { if (App) App.toast('Token swaps not supported on this network', 'warning'); return; }
+                    const token = prompt('ERC-20 token address to buy (0x...):');
+                    if (!token) return;
+                    const amount = prompt('Amount of ETH to spend:');
+                    if (!amount) return;
+                    try {
+                        // Show a live quote and confirm before sending.
+                        const out = await W.getSwapQuote(token.trim(), amount.trim());
+                        const ok = confirm(`Quote: ~${out.toString()} token base units for ${amount} ETH.\n\nProceed with the swap (1% max slippage)?`);
+                        if (!ok) return;
+                        const hash = await W.swapEthForToken(token.trim(), amount.trim(), 1);
+                        if (App) App.toast('Swap sent: ' + hash.slice(0, 10) + '…', 'success');
+                        window.open(W.explorerTxUrl(hash), '_blank', 'noopener');
+                    } catch (e) {
+                        if (App) App.toast('Swap failed: ' + (e.code === 4001 ? 'rejected' : e.message), 'error');
+                    }
+                } else {
+                    if (App) App.toast('Type "wrap", "unwrap", or "buy".', 'error');
                 }
             });
 

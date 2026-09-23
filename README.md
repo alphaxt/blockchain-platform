@@ -38,7 +38,9 @@ You can run it two ways:
 - Reacts to account/chain changes and restores the session on reload
 - Chain switching helper and toast notifications
 - **Send native ETH** through the connected wallet (`eth_sendTransaction`), with precise wei conversion and a post-send balance refresh
-- **On-chain swap** — wrap / unwrap native ETH ↔ WETH by calling the canonical WETH9 contract directly (`deposit()` / `withdraw(uint256)`); a real on-chain transaction that needs no API key or SDK, supported on 7 chains
+- **On-chain swaps** — two real, key-less swap paths through the connected provider:
+  - Wrap / unwrap native ETH ↔ WETH via the canonical WETH9 contract (`deposit()` / `withdraw(uint256)`), on 7 chains
+  - Buy any ERC-20 with ETH via a Uniswap V2-style router (`getAmountsOut` quote → `swapExactETHForTokens` with a 1% slippage floor and a 20-minute deadline), on Ethereum, Sepolia, Polygon, BSC, and Arbitrum
 - **Sign messages** with `personal_sign`
 - **Block-explorer links** for the connected address and sent transactions, resolved per chain (Etherscan, Polygonscan, Arbiscan, and more)
 
@@ -239,7 +241,7 @@ configure it — everything else keeps working.
 
 ## 🎯 Future Enhancements
 
-- Token-to-token swaps via a DEX router (native ETH ↔ WETH wrapping is supported today)
+- Token → ETH and token → token swaps (the ETH → token direction is supported today; selling a token first needs an ERC-20 `approve` step)
 - Multi-device sessions and token refresh for wallet sign-in
 - Move the remaining page-specific inline CSS into per-feature stylesheets (the shared "chrome" is already centralized in `css/shared.css`)
 

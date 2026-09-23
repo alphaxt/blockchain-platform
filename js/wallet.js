@@ -411,6 +411,111 @@
     throw new Error('Unknown swap direction: ' + direction);
   }
 
+  // --- DEX swap: native ETH -> ERC-20 token (Uniswap V2 router) --------
+  // A real token-for-token swap through the connected provider, no API key
+  // or SDK. We quote with router.getAmountsOut (eth_call) then execute
+  // router.swapExactETHForTokens with a slippage-protected minimum out.
+  // Selling tokens back needs an ERC-20 approve first, so this first cut
+  // covers the ETH -> token direction (no approval required).
+  const DEX_ROUTERS = {
+    '0x1':    '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D', // Uniswap V2 (Ethereum)
+    '0xaa36a7':'0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008', // Uniswap V2 (Sepolia)
+    '0x89':   '0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff', // QuickSwap (Polygon)
+    '0x38':   '0x10ED43C718714eb63d5aA57B78B54704E256024E', // PancakeSwap (BSC)
+    '0xa4b1': '0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24'  // Uniswap V2 (Arbitrum)
+  };
+  const DEX_SELECTORS = {
+    swapExactETHForTokens: '7ff36ab5', // (uint256 amountOutMin, address[] path, address to, uint256 deadline)
+    getAmountsOut:         'd06ca61f'  // (uint256 amountIn, address[] path)
+  };
+
+  function dexRouter() {
+    const addr = DEX_ROUTERS[state.chainId];
+    if (!addr) throw new Error('Token swaps are not supported on this network.');
+    return addr;
+  }
+
+  /** Whether ETH -> token DEX swaps are available on the current chain. */
+  function dexSwapSupported() {
+    return !!DEX_ROUTERS[state.chainId];
+  }
+
+  function uintHex32(nBig) {
+    return nBig.toString(16).padStart(64, '0');
+  }
+  function addrHex32(a) {
+    return a.toLowerCase().replace(/^0x/, '').padStart(64, '0');
+  }
+  function encodeAddressArray(addrs) {
+    let out = uintHex32(BigInt(addrs.length));
+    for (const a of addrs) out += addrHex32(a);
+    return out;
+  }
+
+  /**
+   * Quote how many output-token base units you'd receive for `amountEth`.
+   * Uses router.getAmountsOut via eth_call (read-only, no gas).
+   * @param {string} tokenOut ERC-20 address to receive
+   * @param {string|number} amountEth ETH to spend
+   * @returns {Promise<bigint>} output amount in the token's base units
+   */
+  async function getSwapQuote(tokenOut, amountEth) {
+    if (!/^0x[a-fA-F0-9]{40}$/.test(tokenOut)) throw new Error('Invalid token address.');
+    const path = [wethAddress(), tokenOut];
+    const amountInWei = BigInt(ethToWeiHex(amountEth));
+    // getAmountsOut(amountIn, path): head = [amountIn][offset=0x40], then path.
+    const data = '0x' + DEX_SELECTORS.getAmountsOut +
+      uintHex32(amountInWei) + uintHex32(64n) + encodeAddressArray(path);
+    const hex = await provider().request({
+      method: 'eth_call',
+      params: [{ to: dexRouter(), data }, 'latest']
+    });
+    // Returns uint256[] : [offset][length][amounts...]. Take the last amount.
+    const body = hex.replace(/^0x/, '');
+    const len = Number(BigInt('0x' + body.slice(64, 128)));
+    if (!len) throw new Error('No liquidity route for this pair.');
+    const lastStart = 128 + (len - 1) * 64;
+    return BigInt('0x' + body.slice(lastStart, lastStart + 64));
+  }
+
+  /**
+   * Swap native ETH for an ERC-20 token via the DEX router.
+   * @param {string} tokenOut ERC-20 address to receive
+   * @param {string|number} amountEth ETH to spend
+   * @param {number} [slippagePct] max slippage tolerance (default 1%)
+   * @returns {Promise<string>} transaction hash
+   */
+  async function swapEthForToken(tokenOut, amountEth, slippagePct = 1) {
+    if (!hasProvider()) throw new Error('No Web3 wallet found.');
+    if (!state.account) throw new Error('Connect a wallet first.');
+    if (!/^0x[a-fA-F0-9]{40}$/.test(tokenOut)) throw new Error('Invalid token address.');
+    const amt = Number(amountEth);
+    if (isNaN(amt) || amt <= 0) throw new Error('Enter a valid amount.');
+
+    // Quote, then apply slippage tolerance for amountOutMin.
+    const quoted = await getSwapQuote(tokenOut, amountEth);
+    const bps = BigInt(Math.round((100 - slippagePct) * 100)); // e.g. 1% -> 9900
+    const amountOutMin = quoted * bps / 10000n;
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + 20 * 60); // 20 min
+    const path = [wethAddress(), tokenOut];
+
+    // swapExactETHForTokens(amountOutMin, path, to, deadline): 4 head slots
+    // (path is dynamic -> its slot holds offset 0x80), then path data.
+    const data = '0x' + DEX_SELECTORS.swapExactETHForTokens +
+      uintHex32(amountOutMin) +
+      uintHex32(128n) +
+      addrHex32(state.account) +
+      uintHex32(deadline) +
+      encodeAddressArray(path);
+
+    const txHash = await provider().request({
+      method: 'eth_sendTransaction',
+      params: [{ from: state.account, to: dexRouter(), value: ethToWeiHex(amountEth), data }]
+    });
+    setTimeout(() => refreshBalance().then(emit), 3000);
+    return txHash;
+  }
+
   // --- WalletConnect (mobile wallets via QR / deep link) -------------
   // Build-free integration: the @walletconnect/ethereum-provider SDK is
   // lazy-loaded from a CDN as an ES module only when the user chooses
@@ -509,6 +614,9 @@
     getWethBalance,
     swapSupported,
     wrappedSymbol,
+    swapEthForToken,
+    getSwapQuote,
+    dexSwapSupported,
     explorerAddressUrl,
     explorerTxUrl,
     onChange,

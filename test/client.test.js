@@ -222,6 +222,55 @@ test('wallet: walletConnectAvailable reads the configured project id', () => {
   assert.strictEqual(withId.win.CryptoHubWallet.walletConnectAvailable(), true);
 });
 
+test('wallet: dexSwapSupported reflects the chain', async () => {
+  const on = loadModule(WALLET_SRC, { ethereum: recordingProvider({ eth_chainId: '0x1' }) });
+  await on.win.CryptoHubWallet.connect();
+  assert.strictEqual(on.win.CryptoHubWallet.dexSwapSupported(), true);
+  const off = loadModule(WALLET_SRC, { ethereum: recordingProvider({ eth_chainId: '0xa' }) }); // Optimism: no router configured
+  await off.win.CryptoHubWallet.connect();
+  assert.strictEqual(off.win.CryptoHubWallet.dexSwapSupported(), false);
+});
+
+// Encode a uint256[] eth_call return for a quote whose last element is `out`.
+function quoteReturn(out) {
+  const u = (n) => BigInt(n).toString(16).padStart(64, '0');
+  return '0x' + u(2) + u(2) + u(1) + u(out); // offset, length=2, amounts[0], amounts[1]=out
+}
+
+test('wallet: getSwapQuote parses the router getAmountsOut result', async () => {
+  const provider = recordingProvider({ eth_chainId: '0x1', eth_call: quoteReturn(2500000) });
+  const { win } = loadModule(WALLET_SRC, { ethereum: provider });
+  const W = win.CryptoHubWallet;
+  await W.connect();
+  const q = await W.getSwapQuote('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '1');
+  assert.strictEqual(q, 2500000n);
+});
+
+test('wallet: swapEthForToken builds a correct router tx with slippage', async () => {
+  const provider = recordingProvider({ eth_chainId: '0x1', eth_call: quoteReturn(2000000) });
+  const { win } = loadModule(WALLET_SRC, { ethereum: provider });
+  const W = win.CryptoHubWallet;
+  await W.connect();
+  const USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
+  await W.swapEthForToken(USDC, '1', 1); // 1% slippage
+  const tx = provider.calls.find((c) => c.method === 'eth_sendTransaction');
+  assert.strictEqual(tx.params[0].to, '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'); // Uniswap V2 router
+  assert.strictEqual(BigInt(tx.params[0].value), 1000000000000000000n); // 1 ETH
+  assert.ok(tx.params[0].data.startsWith('0x7ff36ab5'), 'swapExactETHForTokens selector');
+  const body = tx.params[0].data.slice(10);
+  const amountOutMin = BigInt('0x' + body.slice(0, 64));
+  assert.strictEqual(amountOutMin, 1980000n, '2,000,000 minus 1% slippage');
+  assert.strictEqual(BigInt('0x' + body.slice(64, 128)), 128n, 'path offset 0x80');
+  assert.ok(tx.params[0].data.toLowerCase().includes(USDC.slice(2).toLowerCase()), 'path includes token');
+});
+
+test('wallet: swapEthForToken rejects a bad token address', async () => {
+  const { win } = loadModule(WALLET_SRC, { ethereum: recordingProvider({ eth_chainId: '0x1' }) });
+  const W = win.CryptoHubWallet;
+  await W.connect();
+  await assert.rejects(() => W.swapEthForToken('nope', '1'), /Invalid token address/);
+});
+
 test('wallet: explorer URLs resolve per chain', async () => {
   const provider = recordingProvider({ eth_chainId: '0x89' });
   const { win } = loadModule(WALLET_SRC, { ethereum: provider });
